@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from antenna.config import Settings
 from antenna.db import Database, db_to_dt, utcnow
@@ -31,6 +31,10 @@ class ScanService:
         self.thumbnails = thumbnails
         self.logger = get_logger("antenna.scan")
         self._lock = threading.Lock()
+        self._schedule_changed: Callable[[], None] | None = None
+
+    def set_schedule_changed_callback(self, callback: Callable[[], None]) -> None:
+        self._schedule_changed = callback
 
     def start(self, *, force: bool = False, limit_accounts: list[str] | None = None) -> dict[str, Any]:
         if not self._lock.acquire(blocking=False):
@@ -112,6 +116,14 @@ class ScanService:
                     self.db.update_scan(scan_id, message=f"Finished {username}", stats=stats)
                 except TwitterRateLimitError as exc:
                     pause_until = self.scheduler.pause_for_rate_limit()
+                    self.db.create_scan_resume(
+                        source_scan_id=scan_id,
+                        force=force,
+                        limit_accounts=self._remaining_accounts(accounts, username),
+                        failed_account=username,
+                    )
+                    if self._schedule_changed:
+                        self._schedule_changed()
                     state = self.db.get_account_state(username) or {}
                     self.db.upsert_account_state(
                         username,
@@ -191,3 +203,10 @@ class ScanService:
         if not tweets:
             return None
         return max(tweet.created_at for tweet in tweets)
+
+    def _remaining_accounts(self, accounts: list[str], username: str) -> list[str]:
+        try:
+            index = accounts.index(username)
+        except ValueError:
+            return [username]
+        return accounts[index:]

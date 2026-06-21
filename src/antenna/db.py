@@ -132,6 +132,73 @@ class Database:
                 (key, value, now),
             )
 
+    def create_scan_resume(
+        self,
+        *,
+        source_scan_id: int,
+        force: bool,
+        limit_accounts: list[str],
+        failed_account: str,
+    ) -> int:
+        now = dt_to_db(utcnow())
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE scan_resume_state
+                SET status = 'cancelled'
+                WHERE status = 'pending'
+                """
+            )
+            cursor = conn.execute(
+                """
+                INSERT INTO scan_resume_state (
+                    source_scan_id, reason, force, limit_accounts_json,
+                    failed_account, status, created_at
+                )
+                VALUES (?, 'rate_limited', ?, ?, ?, 'pending', ?)
+                """,
+                (
+                    source_scan_id,
+                    1 if force else 0,
+                    json.dumps(limit_accounts, ensure_ascii=False),
+                    failed_account,
+                    now,
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def get_pending_scan_resume(self) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM scan_resume_state
+                WHERE status = 'pending'
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        return self._scan_resume_row(row)
+
+    def consume_scan_resume(self, resume_id: int) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE scan_resume_state
+                SET status = 'consumed', consumed_at = ?
+                WHERE id = ? AND status = 'pending'
+                """,
+                (dt_to_db(utcnow()), resume_id),
+            )
+
+    def _scan_resume_row(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        data = dict(row)
+        data["force"] = bool(data["force"])
+        data["limit_accounts"] = json.loads(data.pop("limit_accounts_json") or "[]")
+        return data
+
     def get_account_state(self, username: str) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute(

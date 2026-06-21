@@ -78,6 +78,25 @@ CREATE TABLE IF NOT EXISTS runtime_state (
     PRIMARY KEY (key)
 );
 
+CREATE TABLE IF NOT EXISTS scan_resume_state (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_scan_id INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    force INTEGER NOT NULL,
+    limit_accounts_json TEXT NOT NULL,
+    failed_account TEXT,
+    status TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    consumed_at TIMESTAMP,
+    FOREIGN KEY (source_scan_id)
+        REFERENCES scans (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CHECK (reason IN ('rate_limited')),
+    CHECK (force IN (0, 1)),
+    CHECK (status IN ('pending', 'consumed', 'cancelled'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_youtube_process_start_at
 ON youtube (process, start_at DESC);
 
@@ -87,3 +106,6 @@ ON youtube (video_id);
 CREATE INDEX IF NOT EXISTS idx_twitter_user_created_at
 ON twitter (user_screen_name, created_at DESC);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_resume_pending
+ON scan_resume_state (status)
+WHERE status = 'pending';

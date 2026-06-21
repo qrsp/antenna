@@ -34,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     review = ReviewService(db)
     scanner = ScanService(settings, db, scheduler, twitter, youtube, thumbnails)
     auto_scanner = AutoScanService(scanner, scheduler)
+    scanner.set_schedule_changed_callback(auto_scanner.wake)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
