@@ -20,11 +20,11 @@
 <section class="metrics">
   <div class="metric">
     <span class="metric-label">New Finds</span>
-    <strong id="unchecked-count">{{ unchecked_count }}</strong>
+    <strong id="new-count">{{ new_count }}</strong>
   </div>
   <div class="metric">
     <span class="metric-label">Archived</span>
-    <strong id="checked-count">{{ checked_count }}</strong>
+    <strong id="archived-count">{{ archived_count }}</strong>
   </div>
   <div class="metric">
     <span class="metric-label">Next Auto Scan</span>
@@ -62,8 +62,8 @@
   const messageEl = document.querySelector("#scan-message");
   const progressBar = document.querySelector("#scan-progress-bar");
   const progressText = document.querySelector("#scan-progress-text");
-  const uncheckedCountEl = document.querySelector("#unchecked-count");
-  const checkedCountEl = document.querySelector("#checked-count");
+  const newCountEl = document.querySelector("#new-count");
+  const archivedCountEl = document.querySelector("#archived-count");
 
   function renderScan(scan) {
     if (!statusEl || !scan) return;
@@ -92,8 +92,8 @@
       }
       if (countsResponse.ok) {
         const counts = await countsResponse.json();
-        uncheckedCountEl.textContent = counts.uncheck;
-        checkedCountEl.textContent = counts.checked;
+        newCountEl.textContent = counts.new;
+        archivedCountEl.textContent = counts.archived;
       }
     } catch (error) {
       console.debug("scan refresh failed", error);

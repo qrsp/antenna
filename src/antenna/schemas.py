@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-ProcessState = Literal["checked", "uncheck"]
+LibraryState = Literal["archived", "new"]
 
 
 class HealthResponse(BaseModel):
@@ -26,13 +26,13 @@ class ScanResponse(BaseModel):
     stats: dict = Field(default_factory=dict)
 
 
-class ProcessUpdateRequest(BaseModel):
-    process: ProcessState
+class LibraryStateUpdateRequest(BaseModel):
+    state: LibraryState
 
 
-class BulkProcessUpdateRequest(BaseModel):
+class BulkLibraryStateUpdateRequest(BaseModel):
     urls: list[str]
-    process: ProcessState
+    state: LibraryState
 
 
 class VideoResponse(BaseModel):
@@ -44,7 +44,7 @@ class VideoResponse(BaseModel):
     start_at: str | None
     media_type: str | None
     status: str
-    process: ProcessState
+    library_state: LibraryState
     thumbnail_path: str | None
     created_at: str
     updated_at: str

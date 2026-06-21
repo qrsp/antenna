@@ -6,31 +6,31 @@
   <div class="library-copy">
     <span class="eyebrow">Antenna Music Radar</span>
     <h1>Music Discovery Library</h1>
-    <p>自動收集歌手、VTuber、直播與音樂影片，像私人唱片店一樣慢慢整理你的待聽清單。</p>
+    <p>A private shelf for music, live sessions, and creator signals gathered from your tracked accounts.</p>
   </div>
   <div class="library-stats" aria-label="Current library queue">
     <span>{{ total_count }}</span>
-    <strong>{{ "new finds" if process == "uncheck" else "archived picks" }}</strong>
+    <strong>{{ "new finds" if state == "new" else "archived picks" }}</strong>
   </div>
 </section>
 
 <section class="library-toolbar">
   <div class="segmented">
-    <a class="{{ 'active' if process == 'uncheck' else '' }}" href="/videos?process=uncheck">New</a>
-    <a class="{{ 'active' if process == 'checked' else '' }}" href="/videos?process=checked">Archived</a>
+    <a class="{{ 'active' if state == 'new' else '' }}" href="/videos?state=new">New</a>
+    <a class="{{ 'active' if state == 'archived' else '' }}" href="/videos?state=archived">Archived</a>
   </div>
-  <p>{{ "Fresh discoveries waiting for a listen." if process == "uncheck" else "Saved signals already archived." }}</p>
+  <p>{{ "Fresh discoveries waiting for a listen." if state == "new" else "Saved signals already archived." }}</p>
 </section>
 
-<form action="/videos/process" method="post">
-  <input type="hidden" name="process" value="{{ 'checked' if process == 'uncheck' else 'uncheck' }}">
-  <input type="hidden" name="return_process" value="{{ process }}">
+<form action="/videos/state" method="post">
+  <input type="hidden" name="state" value="{{ 'archived' if state == 'new' else 'new' }}">
+  <input type="hidden" name="return_state" value="{{ state }}">
   <div class="bulkbar">
-    {% if process == 'uncheck' and videos %}
+    {% if state == 'new' and videos %}
     <button class="button secondary" type="button" data-select-all>Select all</button>
     {% endif %}
     <button class="button" type="submit">
-      Mark {{ 'archived' if process == 'uncheck' else 'new' }}
+      Mark {{ 'archived' if state == 'new' else 'new' }}
     </button>
   </div>
 
@@ -62,28 +62,28 @@
   </section>
   {% else %}
   <section class="library-empty">
-    <h2>{{ "No new discoveries." if process == "uncheck" else "No archived picks yet." }}</h2>
-    <p>{{ "Run a scan and Antenna will restock this shelf." if process == "uncheck" else "Mark new finds as archived to build your archive." }}</p>
+    <h2>{{ "No new discoveries." if state == "new" else "No archived picks yet." }}</h2>
+    <p>{{ "Run a scan and Antenna will restock this shelf." if state == "new" else "Mark new finds as archived to build your archive." }}</p>
   </section>
   {% endif %}
 </form>
 
-{% if process == 'uncheck' and total_count > 0 %}
-<form class="dangerbar" action="/videos/check-all" method="post">
+{% if state == 'new' and total_count > 0 %}
+<form class="dangerbar" action="/videos/archive-all" method="post">
   <button class="button" type="submit">Archive all {{ total_count }} finds</button>
 </form>
 {% endif %}
 
 {% if total_pages > 1 %}
-<nav class="pagination" aria-label="{{ process }} videos pages">
+<nav class="pagination" aria-label="{{ state }} videos pages">
   {% if page > 1 %}
-  <a href="/videos?process={{ process }}&page={{ page - 1 }}">Previous</a>
+  <a href="/videos?state={{ state }}&page={{ page - 1 }}">Previous</a>
   {% else %}
   <span>Previous</span>
   {% endif %}
   <strong>Page {{ page }} / {{ total_pages }}</strong>
   {% if page < total_pages %}
-  <a href="/videos?process={{ process }}&page={{ page + 1 }}">Next</a>
+  <a href="/videos?state={{ state }}&page={{ page + 1 }}">Next</a>
   {% else %}
   <span>Next</span>
   {% endif %}

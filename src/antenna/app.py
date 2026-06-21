@@ -11,10 +11,11 @@ from fastapi.templating import Jinja2Templates
 from antenna import __version__
 from antenna.config import Settings, load_settings
 from antenna.db import Database
+from antenna.models import LIBRARY_ARCHIVED, LIBRARY_NEW
 from antenna.presentation import local_time
 from antenna.routers import health, scans, settings as settings_router, videos
-from antenna.services.review_service import ReviewService
 from antenna.services.auto_scan_service import AutoScanService
+from antenna.services.library_service import LibraryService
 from antenna.services.scan_service import ScanService
 from antenna.services.scheduler_service import SchedulerService
 from antenna.services.thumbnail_service import ThumbnailService
@@ -31,7 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     youtube = YoutubeService()
     thumbnails = ThumbnailService(settings)
     twitter = TwitterService(settings.twitter)
-    review = ReviewService(db)
+    library = LibraryService(db)
     scanner = ScanService(settings, db, scheduler, twitter, youtube, thumbnails)
     auto_scanner = AutoScanService(scanner, scheduler)
     scanner.set_schedule_changed_callback(auto_scanner.wake)
@@ -48,7 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.db = db
     app.state.scheduler = scheduler
-    app.state.review = review
+    app.state.library = library
     app.state.scanner = scanner
     app.state.auto_scanner = auto_scanner
     package_dir = Path(__file__).resolve().parent
@@ -71,8 +72,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             request,
             "dashboard.html",
             {
-                "unchecked_count": db.count_videos("uncheck"),
-                "checked_count": db.count_videos("checked"),
+                "new_count": db.count_videos(LIBRARY_NEW),
+                "archived_count": db.count_videos(LIBRARY_ARCHIVED),
                 "latest_scan": latest_scan,
                 "next_scan_at": next_scan_at,
                 "settings": settings,

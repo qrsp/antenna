@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
-PROCESS_CHECKED = "checked"
-PROCESS_UNCHECK = "uncheck"
-VALID_PROCESS = {PROCESS_CHECKED, PROCESS_UNCHECK}
+LIBRARY_ARCHIVED = "archived"
+LIBRARY_NEW = "new"
+VALID_LIBRARY_STATES = {LIBRARY_ARCHIVED, LIBRARY_NEW}
 
 
 @dataclass(frozen=True)

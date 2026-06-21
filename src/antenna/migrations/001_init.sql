@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS youtube (
     start_at TIMESTAMP,
     media_type TEXT,
     status TEXT NOT NULL,
-    process TEXT NOT NULL DEFAULT 'uncheck',
+    library_state TEXT NOT NULL DEFAULT 'new',
     thumbnail_path TEXT,
     metadata_json TEXT,
     created_at TIMESTAMP NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS youtube (
         REFERENCES urls (url)
         ON DELETE CASCADE
         ON UPDATE CASCADE,
-    CHECK (process IN ('checked', 'uncheck'))
+    CHECK (library_state IN ('archived', 'new'))
 );
 
 CREATE TABLE IF NOT EXISTS scans (
@@ -78,6 +78,12 @@ CREATE TABLE IF NOT EXISTS runtime_state (
     PRIMARY KEY (key)
 );
 
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    name TEXT NOT NULL,
+    applied_at TIMESTAMP NOT NULL,
+    PRIMARY KEY (name)
+);
+
 CREATE TABLE IF NOT EXISTS scan_resume_state (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_scan_id INTEGER NOT NULL,
@@ -97,11 +103,11 @@ CREATE TABLE IF NOT EXISTS scan_resume_state (
     CHECK (status IN ('pending', 'consumed', 'cancelled'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_youtube_process_start_at
-ON youtube (process, start_at DESC);
+CREATE INDEX IF NOT EXISTS idx_youtube_library_state_start_at
+ON youtube (library_state, start_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_youtube_process_sort_at
-ON youtube (process, COALESCE(start_at, created_at) DESC);
+CREATE INDEX IF NOT EXISTS idx_youtube_library_state_sort_at
+ON youtube (library_state, COALESCE(start_at, created_at) DESC);
 
 CREATE INDEX IF NOT EXISTS idx_youtube_video_id
 ON youtube (video_id);

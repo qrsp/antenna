@@ -72,7 +72,7 @@ def test_scan_forms_start_regular_and_force_scans(tmp_path):
     ]
 
 
-def test_checked_page_paginates_and_check_all_updates_review_queue(tmp_path):
+def test_archived_page_paginates_and_archive_all_updates_new_queue(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
 
@@ -94,28 +94,28 @@ def test_checked_page_paginates_and_check_all_updates_review_queue(tmp_path):
             None,
         )
 
-    check_all = client.post("/videos/check-all", follow_redirects=False)
-    assert check_all.status_code == 303
-    assert check_all.headers["location"] == "/videos?process=uncheck"
-    assert app.state.db.count_videos("uncheck") == 0
-    assert app.state.db.count_videos("checked") == 25
+    archive_all = client.post("/videos/archive-all", follow_redirects=False)
+    assert archive_all.status_code == 303
+    assert archive_all.headers["location"] == "/videos?state=new"
+    assert app.state.db.count_videos("new") == 0
+    assert app.state.db.count_videos("archived") == 25
 
-    page = client.get("/videos?process=checked&page=2")
+    page = client.get("/videos?state=archived&page=2")
     assert page.status_code == 200
     assert "Page 2 / 2" in page.text
 
 
-def test_review_page_paginates_and_times_use_local_time(tmp_path):
+def test_new_page_paginates_and_times_use_local_time(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
 
     for index in range(25):
-        video_id = f"review{index}"
+        video_id = f"new{index}"
         app.state.db.save_youtube(
             YoutubeMetadata(
                 url=f"https://www.youtube.com/watch?v={video_id}",
                 video_id=video_id,
-                title=f"Review {index}",
+                title=f"New {index}",
                 channel_id=None,
                 channel_name=None,
                 start_at=utcnow() - timedelta(minutes=index),
@@ -127,14 +127,14 @@ def test_review_page_paginates_and_times_use_local_time(tmp_path):
             None,
         )
 
-    page = client.get("/videos?process=uncheck&page=2")
+    page = client.get("/videos?state=new&page=2")
 
     assert page.status_code == 200
     assert "Page 2 / 2" in page.text
     assert "data-local-time" in page.text
 
 
-def test_review_page_lazy_loads_thumbnails(tmp_path):
+def test_new_page_lazy_loads_thumbnails(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
     app.state.db.save_youtube(
@@ -153,7 +153,7 @@ def test_review_page_lazy_loads_thumbnails(tmp_path):
         "static/thumbnails/thumbed.jpg",
     )
 
-    page = client.get("/videos?process=uncheck")
+    page = client.get("/videos?state=new")
 
     assert page.status_code == 200
     assert 'loading="lazy"' in page.text
@@ -213,15 +213,15 @@ def test_single_account_scan_form_forces_limited_scan(tmp_path):
     ]
 
 
-def test_mark_checked_stays_on_review_page(tmp_path):
+def test_mark_archived_stays_on_new_page(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
-    url = "https://www.youtube.com/watch?v=stayreview"
+    url = "https://www.youtube.com/watch?v=staynew"
     app.state.db.save_youtube(
         YoutubeMetadata(
             url=url,
-            video_id="stayreview",
-            title="Stay Review",
+            video_id="staynew",
+            title="Stay New",
             channel_id=None,
             channel_name=None,
             start_at=utcnow(),
@@ -234,15 +234,15 @@ def test_mark_checked_stays_on_review_page(tmp_path):
     )
 
     response = client.post(
-        "/videos/process",
-        data={"process": "checked", "return_process": "uncheck", "urls": [url]},
+        "/videos/state",
+        data={"state": "archived", "return_state": "new", "urls": [url]},
         follow_redirects=False,
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/videos?process=uncheck"
-    assert app.state.db.count_videos("uncheck") == 0
-    assert app.state.db.count_videos("checked") == 1
+    assert response.headers["location"] == "/videos?state=new"
+    assert app.state.db.count_videos("new") == 0
+    assert app.state.db.count_videos("archived") == 1
 
 
 def test_video_counts_api(tmp_path):
@@ -267,4 +267,4 @@ def test_video_counts_api(tmp_path):
     response = client.get("/api/videos/counts")
 
     assert response.status_code == 200
-    assert response.json() == {"uncheck": 1, "checked": 0}
+    assert response.json() == {"new": 1, "archived": 0}

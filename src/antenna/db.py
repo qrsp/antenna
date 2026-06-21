@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from antenna.config import Settings
-from antenna.models import PROCESS_UNCHECK, VALID_PROCESS, TweetRecord, YoutubeMetadata
+from antenna.models import LIBRARY_NEW, VALID_LIBRARY_STATES, TweetRecord, YoutubeMetadata
 
 
 def utcnow() -> datetime:
@@ -50,9 +50,109 @@ class Database:
             conn.close()
 
     def initialize(self) -> None:
-        migration_path = Path(__file__).resolve().parent / "migrations" / "001_init.sql"
+        migration_dir = Path(__file__).resolve().parent / "migrations"
         with self.connect() as conn:
-            conn.executescript(migration_path.read_text(encoding="utf-8"))
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    name TEXT NOT NULL,
+                    applied_at TIMESTAMP NOT NULL,
+                    PRIMARY KEY (name)
+                )
+                """
+            )
+            self._migrate_legacy_video_library_state(conn)
+            applied = {
+                row["name"]
+                for row in conn.execute("SELECT name FROM schema_migrations").fetchall()
+            }
+            for migration_path in sorted(migration_dir.glob("*.sql")):
+                if migration_path.name in applied:
+                    continue
+                conn.executescript(migration_path.read_text(encoding="utf-8"))
+                conn.execute(
+                    "INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)",
+                    (migration_path.name, dt_to_db(utcnow())),
+                )
+
+    def _migrate_legacy_video_library_state(self, conn: sqlite3.Connection) -> None:
+        table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'youtube'",
+        ).fetchone()
+        if table is None:
+            return
+
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(youtube)").fetchall()}
+        if "library_state" in columns:
+            return
+        if "process" not in columns:
+            return
+
+        conn.execute("DROP INDEX IF EXISTS idx_youtube_process_start_at")
+        conn.execute("DROP INDEX IF EXISTS idx_youtube_process_sort_at")
+        conn.execute(
+            """
+            CREATE TABLE youtube_migrated (
+                url TEXT NOT NULL,
+                video_id TEXT NOT NULL,
+                title TEXT,
+                channel_id TEXT,
+                channel_name TEXT,
+                start_at TIMESTAMP,
+                media_type TEXT,
+                status TEXT NOT NULL,
+                library_state TEXT NOT NULL DEFAULT 'new',
+                thumbnail_path TEXT,
+                metadata_json TEXT,
+                created_at TIMESTAMP NOT NULL,
+                updated_at TIMESTAMP NOT NULL,
+                PRIMARY KEY (url),
+                FOREIGN KEY (url)
+                    REFERENCES urls (url)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE,
+                CHECK (library_state IN ('archived', 'new'))
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO youtube_migrated (
+                url, video_id, title, channel_id, channel_name, start_at, media_type,
+                status, library_state, thumbnail_path, metadata_json, created_at, updated_at
+            )
+            SELECT
+                url,
+                video_id,
+                title,
+                channel_id,
+                channel_name,
+                start_at,
+                media_type,
+                status,
+                CASE process WHEN 'checked' THEN 'archived' ELSE 'new' END,
+                thumbnail_path,
+                metadata_json,
+                created_at,
+                updated_at
+            FROM youtube
+            """
+        )
+        conn.execute("DROP TABLE youtube")
+        conn.execute("ALTER TABLE youtube_migrated RENAME TO youtube")
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_youtube_library_state_start_at
+            ON youtube (library_state, start_at DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_youtube_library_state_sort_at
+            ON youtube (library_state, COALESCE(start_at, created_at) DESC)
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_youtube_video_id ON youtube (video_id)")
 
     def ping(self) -> bool:
         with self.connect() as conn:
@@ -315,7 +415,7 @@ class Database:
                 """
                 INSERT INTO youtube (
                     url, video_id, title, channel_id, channel_name, start_at, media_type,
-                    status, process, thumbnail_path, metadata_json, created_at, updated_at
+                    status, library_state, thumbnail_path, metadata_json, created_at, updated_at
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
@@ -339,7 +439,7 @@ class Database:
                     dt_to_db(item.start_at),
                     item.media_type,
                     item.status,
-                    PROCESS_UNCHECK,
+                    LIBRARY_NEW,
                     thumbnail_path,
                     item.metadata_json,
                     now,
@@ -347,10 +447,10 @@ class Database:
                 ),
             )
 
-    def list_videos(self, process: str = PROCESS_UNCHECK, *, limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
-        if process not in VALID_PROCESS:
-            raise ValueError("invalid process")
-        params: list[Any] = [process]
+    def list_videos(self, state: str = LIBRARY_NEW, *, limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
+        if state not in VALID_LIBRARY_STATES:
+            raise ValueError("invalid library state")
+        params: list[Any] = [state]
         limit_clause = ""
         if limit is not None:
             limit_clause = "LIMIT ? OFFSET ?"
@@ -367,12 +467,12 @@ class Database:
                     start_at,
                     media_type,
                     status,
-                    process,
+                    library_state,
                     thumbnail_path,
                     created_at,
                     updated_at
                 FROM youtube
-                WHERE process = ?
+                WHERE library_state = ?
                 ORDER BY COALESCE(start_at, created_at) DESC
                 {limit_clause}
                 """,
@@ -380,14 +480,14 @@ class Database:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def count_videos(self, process: str) -> int:
+    def count_videos(self, state: str) -> int:
         with self.connect() as conn:
-            row = conn.execute("SELECT COUNT(*) AS count FROM youtube WHERE process = ?", (process,)).fetchone()
+            row = conn.execute("SELECT COUNT(*) AS count FROM youtube WHERE library_state = ?", (state,)).fetchone()
         return int(row["count"])
 
-    def update_video_process(self, urls: list[str], process: str) -> int:
-        if process not in VALID_PROCESS:
-            raise ValueError("invalid process")
+    def update_video_state(self, urls: list[str], state: str) -> int:
+        if state not in VALID_LIBRARY_STATES:
+            raise ValueError("invalid library state")
         if not urls:
             return 0
         now = dt_to_db(utcnow())
@@ -395,19 +495,19 @@ class Database:
             count = 0
             for url in urls:
                 cursor = conn.execute(
-                    "UPDATE youtube SET process = ?, updated_at = ? WHERE url = ?",
-                    (process, now, url),
+                    "UPDATE youtube SET library_state = ?, updated_at = ? WHERE url = ?",
+                    (state, now, url),
                 )
                 count += cursor.rowcount
         return count
 
-    def update_all_video_process(self, from_process: str, to_process: str) -> int:
-        if from_process not in VALID_PROCESS or to_process not in VALID_PROCESS:
-            raise ValueError("invalid process")
+    def update_all_video_state(self, from_state: str, to_state: str) -> int:
+        if from_state not in VALID_LIBRARY_STATES or to_state not in VALID_LIBRARY_STATES:
+            raise ValueError("invalid library state")
         now = dt_to_db(utcnow())
         with self.connect() as conn:
             cursor = conn.execute(
-                "UPDATE youtube SET process = ?, updated_at = ? WHERE process = ?",
-                (to_process, now, from_process),
+                "UPDATE youtube SET library_state = ?, updated_at = ? WHERE library_state = ?",
+                (to_state, now, from_state),
             )
             return cursor.rowcount
