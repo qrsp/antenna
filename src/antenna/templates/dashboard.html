@@ -26,8 +26,8 @@
     <strong id="checked-count">{{ checked_count }}</strong>
   </div>
   <div class="metric">
-    <span class="metric-label">Rate Limit Pause</span>
-    <strong>{{ (pause_until | taipei_time) ~ " 台灣時間" if pause_until else "None" }}</strong>
+    <span class="metric-label">Next Auto Scan</span>
+    <strong>{{ next_scan_at | local_time }}</strong>
   </div>
 </section>
 
@@ -38,8 +38,8 @@
     <tbody>
       <tr><th>ID</th><td id="scan-id">{{ latest_scan.id }}</td></tr>
       <tr><th>Status</th><td id="scan-status">{{ latest_scan.status }}</td></tr>
-      <tr><th>Started</th><td>{{ (latest_scan.started_at | taipei_time) ~ " 台灣時間" if latest_scan.started_at else "" }}</td></tr>
-      <tr><th>Finished</th><td>{{ (latest_scan.finished_at | taipei_time) ~ " 台灣時間" if latest_scan.finished_at else "" }}</td></tr>
+      <tr><th>Started</th><td>{{ latest_scan.started_at | local_time }}</td></tr>
+      <tr><th>Finished</th><td>{{ latest_scan.finished_at | local_time }}</td></tr>
       <tr><th>Message</th><td id="scan-message">{{ latest_scan.message or "" }}</td></tr>
     </tbody>
   </table>

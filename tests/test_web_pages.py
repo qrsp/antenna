@@ -8,9 +8,9 @@ from antenna.db import dt_to_db, utcnow
 from antenna.models import YoutubeMetadata
 
 
-def make_app(tmp_path):
+def make_app(tmp_path, *, follow=None):
     settings = Settings(
-        lists=ListsConfig(),
+        lists=ListsConfig(follow=follow or []),
         app=AppConfig(
             database_url=f"sqlite:///{tmp_path / 'test.db'}",
             thumbnail_dir=str(tmp_path / "thumbnails"),
@@ -28,7 +28,7 @@ class RecordingScanner:
         return {"id": 1, "status": "running", "stats": {}}
 
 
-def test_dashboard_latest_scan_uses_taipei_time(tmp_path):
+def test_dashboard_latest_scan_uses_local_time(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
     scan_id = app.state.db.create_scan()
@@ -37,7 +37,10 @@ def test_dashboard_latest_scan_uses_taipei_time(tmp_path):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "台灣時間" in response.text
+    assert "Next Auto Scan" in response.text
+    assert "Rate Limit Pause" not in response.text
+    assert "data-local-time" in response.text
+    assert "timeZoneName" not in response.text
 
 
 def test_dashboard_has_force_scan_button(tmp_path):
@@ -102,7 +105,7 @@ def test_checked_page_paginates_and_check_all_updates_review_queue(tmp_path):
     assert "Page 2 / 2" in page.text
 
 
-def test_review_page_paginates_and_times_use_taipei(tmp_path):
+def test_review_page_paginates_and_times_use_local_time(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
 
@@ -128,10 +131,10 @@ def test_review_page_paginates_and_times_use_taipei(tmp_path):
 
     assert page.status_code == 200
     assert "Page 2 / 2" in page.text
-    assert "台灣時間" in page.text
+    assert "data-local-time" in page.text
 
 
-def test_settings_rate_limit_pause_uses_taipei_time(tmp_path):
+def test_settings_rate_limit_pause_uses_local_time(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
     pause_until = utcnow() + timedelta(hours=1)
@@ -140,8 +143,47 @@ def test_settings_rate_limit_pause_uses_taipei_time(tmp_path):
     response = client.get("/settings")
 
     assert response.status_code == 200
-    assert "台灣時間" in response.text
+    assert "data-local-time" in response.text
     assert "Pause until" in response.text
+
+
+def test_accounts_page_lists_scan_state_and_scan_button(tmp_path):
+    app = make_app(tmp_path, follow=["example_user"])
+    client = TestClient(app)
+    now = utcnow()
+    app.state.db.upsert_account_state(
+        "example_user",
+        last_scan_at=now - timedelta(hours=2),
+        last_tweet_at=now - timedelta(days=2, hours=3),
+        last_status="success",
+    )
+
+    response = client.get("/accounts")
+
+    assert response.status_code == 200
+    assert "example_user" in response.text
+    assert "Tweet age" in response.text
+    assert "<td>2</td>" in response.text
+    assert 'action="/accounts/scan"' in response.text
+    assert "data-local-time" in response.text
+
+
+def test_single_account_scan_form_forces_limited_scan(tmp_path):
+    app = make_app(tmp_path, follow=["target_user"])
+    app.state.scanner = RecordingScanner()
+    client = TestClient(app)
+
+    response = client.post(
+        "/accounts/scan",
+        data={"username": "target_user"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/accounts"
+    assert app.state.scanner.calls == [
+        {"force": True, "limit_accounts": ["target_user"]},
+    ]
 
 
 def test_mark_checked_stays_on_review_page(tmp_path):

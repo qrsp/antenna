@@ -42,7 +42,7 @@
         <h2><a href="{{ video.url }}" target="_blank" rel="noreferrer">{{ video.title or video.video_id }}</a></h2>
         <p>{{ video.channel_name or video.channel_id or "Unknown channel" }}</p>
         <dl>
-          <div><dt>Start</dt><dd>{{ (video.start_at | taipei_time) ~ " 台灣時間" if video.start_at else "" }}</dd></div>
+          <div><dt>Start</dt><dd>{{ video.start_at | local_time }}</dd></div>
           <div><dt>Status</dt><dd>{{ video.status }}</dd></div>
           <div><dt>Process</dt><dd>{{ video.process }}</dd></div>
         </dl>

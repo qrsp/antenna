@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from antenna import __version__
 from antenna.config import Settings, load_settings
 from antenna.db import Database
-from antenna.presentation import taipei_time
+from antenna.presentation import local_time
 from antenna.routers import health, scans, settings as settings_router, videos
 from antenna.services.review_service import ReviewService
 from antenna.services.auto_scan_service import AutoScanService
@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.auto_scanner = auto_scanner
     package_dir = Path(__file__).resolve().parent
     app.state.templates = Jinja2Templates(directory=str(package_dir / "templates"))
-    app.state.templates.env.filters["taipei_time"] = taipei_time
+    app.state.templates.env.filters["local_time"] = local_time
 
     app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
 
@@ -65,8 +65,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/")
     def dashboard(request: Request):
-        pause_until = scheduler.twitter_pause_until()
         latest_scan = db.get_latest_scan()
+        next_scan_at = auto_scanner.next_scan_at()
         return app.state.templates.TemplateResponse(
             request,
             "dashboard.html",
@@ -74,7 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "unchecked_count": db.count_videos("uncheck"),
                 "checked_count": db.count_videos("checked"),
                 "latest_scan": latest_scan,
-                "pause_until": pause_until,
+                "next_scan_at": next_scan_at,
                 "settings": settings,
             },
         )

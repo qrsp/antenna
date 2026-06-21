@@ -207,6 +207,17 @@ class Database:
             ).fetchone()
         return None if row is None else dict(row)
 
+    def list_account_states(self) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM account_scan_state
+                ORDER BY user_screen_name COLLATE NOCASE
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def upsert_account_state(
         self,
         username: str,

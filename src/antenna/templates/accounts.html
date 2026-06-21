@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Antenna Accounts{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Accounts</h1>
+    <p>Account scan state and per-account scanning.</p>
+  </div>
+</section>
+
+<section class="table-wrap">
+  <h2>Scan State</h2>
+  {% if accounts %}
+  <table>
+    <thead>
+      <tr>
+        <th>Account</th>
+        <th>Last scan</th>
+        <th>Last tweet</th>
+        <th>Tweet age</th>
+        <th>Status</th>
+        <th>Next due</th>
+        <th>Updated</th>
+        <th>Error</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for account in accounts %}
+      <tr>
+        <td>{{ account.user_screen_name }}</td>
+        <td>{{ account.last_scan_at | local_time }}</td>
+        <td>{{ account.last_tweet_at | local_time }}</td>
+        <td>{{ account.last_tweet_age_days if account.last_tweet_age_days is not none else "" }}</td>
+        <td>{{ account.last_status }} <span class="muted">({{ account.schedule_reason }})</span></td>
+        <td>{{ account.next_scan_at | local_time if account.next_scan_at else "Due now" if account.can_scan else "" }}</td>
+        <td>{{ account.updated_at | local_time }}</td>
+        <td>{{ account.last_error or "" }}</td>
+        <td>
+          {% if account.can_scan %}
+          <form action="/accounts/scan" method="post">
+            <input type="hidden" name="username" value="{{ account.user_screen_name }}">
+            <button class="button secondary compact" type="submit">Scan</button>
+          </form>
+          {% else %}
+          <span class="muted">Not configured</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No account scan state yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

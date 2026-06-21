@@ -80,18 +80,22 @@ class AutoScanService:
 
     def _seconds_until_next_scan(self) -> float:
         now = utcnow()
+        next_scan_at = self.next_scan_at(now=now)
+        return max(0.0, (next_scan_at - now).total_seconds())
+
+    def next_scan_at(self, now: datetime | None = None) -> datetime:
+        now = now or utcnow()
         pause_until = self.scheduler.twitter_pause_until()
         if pause_until and pause_until > now:
-            return max(0.0, (pause_until - now).total_seconds())
+            return pause_until
         if self.scanner.is_running():
-            return 5.0
+            return now + timedelta(seconds=5)
         if self.scheduler.db.get_pending_scan_resume():
-            return 0.0
+            return now
 
         latest = self.scheduler.db.get_latest_scan()
         interval = timedelta(minutes=self.scheduler.config.auto_scan_interval_minutes)
-        next_scan_at = self._next_scan_at(latest, interval)
-        return max(0.0, (next_scan_at - now).total_seconds())
+        return self._next_scan_at(latest, interval)
 
     def _next_scan_at(self, latest: dict[str, Any] | None, interval: timedelta) -> datetime:
         if latest is None:
