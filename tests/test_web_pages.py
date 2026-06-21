@@ -163,6 +163,7 @@ def test_accounts_page_lists_scan_state_and_scan_button(tmp_path):
     assert response.status_code == 200
     assert "example_user" in response.text
     assert "Tweet age" in response.text
+    assert "Next account scan" in response.text
     assert "<td>2</td>" in response.text
     assert 'action="/accounts/scan"' in response.text
     assert "data-local-time" in response.text

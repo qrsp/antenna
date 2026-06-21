@@ -44,18 +44,22 @@ class SchedulerService:
 
         last_scan_at = db_to_dt(state.get("last_scan_at"))
         last_tweet_at = db_to_dt(state.get("last_tweet_at"))
-        deferred_until = self.compute_deferred_until(last_scan_at or current, last_tweet_at)
+        deferred_until = self.compute_deferred_until(last_scan_at or current, last_tweet_at, now=current)
 
         if force:
             return AccountDecision(username=username, should_scan=True, reason="forced", deferred_until=deferred_until)
 
+        minimum_after = None
         if last_scan_at:
             minimum_after = last_scan_at + timedelta(minutes=self.config.minimum_scan_interval_minutes)
-            if minimum_after > current:
+            if minimum_after > current and minimum_after >= deferred_until:
                 return AccountDecision(username, False, "minimum_interval", minimum_after)
 
         if deferred_until > current:
             return AccountDecision(username, False, "activity_interval", deferred_until)
+
+        if minimum_after and minimum_after > current:
+            return AccountDecision(username, False, "minimum_interval", minimum_after)
 
         return AccountDecision(username=username, should_scan=True, reason="due", deferred_until=deferred_until)
 
@@ -74,11 +78,17 @@ class SchedulerService:
         ]
         return [item.username for item in decisions if item.should_scan], decisions
 
-    def compute_deferred_until(self, last_scan_at: datetime, last_tweet_at: datetime | None) -> datetime:
+    def compute_deferred_until(
+        self,
+        last_scan_at: datetime,
+        last_tweet_at: datetime | None,
+        *,
+        now: datetime | None = None,
+    ) -> datetime:
         if last_tweet_at is None:
             minutes = self.config.active_account_interval_minutes
         else:
-            current = utcnow()
+            current = now or utcnow()
             inactive_after = timedelta(days=self.config.inactive_after_days)
             if current - last_tweet_at.astimezone(timezone.utc) >= inactive_after:
                 minutes = self.config.inactive_account_interval_minutes
