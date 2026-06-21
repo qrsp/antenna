@@ -25,7 +25,6 @@ class TwitterConfig:
 @dataclass(frozen=True)
 class ListsConfig:
     follow: list[str] = field(default_factory=list)
-    blackurls: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

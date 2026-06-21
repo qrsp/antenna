@@ -175,7 +175,7 @@ class ScanService:
 
         urls = sorted({url for tweet in tweets for url in tweet.urls})
         stats["urls_seen"] += len(urls)
-        youtube_urls = self.youtube.filter_urls(urls, self.settings.lists.blackurls)
+        youtube_urls = self.youtube.filter_urls(urls)
         for url in youtube_urls:
             try:
                 metadata = self.youtube.fetch_metadata(url)

@@ -60,7 +60,7 @@ class RateLimitOnTwitter:
 
 
 class NullYoutube:
-    def filter_urls(self, urls, blackurls):
+    def filter_urls(self, urls):
         return []
 
 
@@ -74,8 +74,6 @@ class ScanSettings:
             database_path = path
 
         class Lists:
-            blackurls = []
-
             def __init__(self, accounts):
                 self.follow = accounts
 

@@ -47,11 +47,9 @@ class YoutubeService:
             return None
         return f"https://www.youtube.com/watch?v={video_id}", video_id
 
-    def filter_urls(self, urls: list[str], blackurls: list[str]) -> list[str]:
+    def filter_urls(self, urls: list[str]) -> list[str]:
         result: list[str] = []
         for url in urls:
-            if self._is_blacklisted(url, blackurls):
-                continue
             canonical = self.canonicalize(url)
             if canonical:
                 result.append(canonical[0])
@@ -124,9 +122,3 @@ class YoutubeService:
         if "unavailable" in lowered:
             return "unavailable"
         return "unknown"
-
-    def _is_blacklisted(self, url: str, blackurls: list[str]) -> bool:
-        host = urlparse(url).hostname or ""
-        text = url.lower()
-        host = host.lower()
-        return any(rule.lower() in host or rule.lower() in text for rule in blackurls)
