@@ -15,6 +15,9 @@
 <form action="/videos/process" method="post">
   <input type="hidden" name="process" value="{{ 'checked' if process == 'uncheck' else 'uncheck' }}">
   <div class="bulkbar">
+    {% if process == 'uncheck' and videos %}
+    <button class="button secondary" type="button" data-select-all>Select all</button>
+    {% endif %}
     <button class="button" type="submit">
       Mark {{ 'checked' if process == 'uncheck' else 'uncheck' }}
     </button>
@@ -50,4 +53,37 @@
   <p class="empty">No videos in this queue.</p>
   {% endif %}
 </form>
+
+{% if process == 'uncheck' and total_count > 0 %}
+<form class="dangerbar" action="/videos/check-all" method="post">
+  <button class="button" type="submit">Check all {{ total_count }} videos</button>
+</form>
+{% endif %}
+
+{% if process == 'checked' and total_pages > 1 %}
+<nav class="pagination" aria-label="Checked videos pages">
+  {% if page > 1 %}
+  <a href="/videos?process=checked&page={{ page - 1 }}">Previous</a>
+  {% else %}
+  <span>Previous</span>
+  {% endif %}
+  <strong>Page {{ page }} / {{ total_pages }}</strong>
+  {% if page < total_pages %}
+  <a href="/videos?process=checked&page={{ page + 1 }}">Next</a>
+  {% else %}
+  <span>Next</span>
+  {% endif %}
+</nav>
+{% endif %}
+
+<script>
+  const selectAllButton = document.querySelector("[data-select-all]");
+  if (selectAllButton) {
+    selectAllButton.addEventListener("click", () => {
+      document.querySelectorAll("input[name='urls']").forEach((input) => {
+        input.checked = true;
+      });
+    });
+  }
+</script>
 {% endblock %}

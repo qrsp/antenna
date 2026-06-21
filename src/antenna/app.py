@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -18,8 +20,20 @@ from antenna.services.twitter_service import TwitterService
 from antenna.services.youtube_service import YoutubeService
 
 
-def create_app() -> FastAPI:
-    settings = load_settings()
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
+
+
+def _taipei_time(value: str | None) -> str:
+    if not value:
+        return ""
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=ZoneInfo("UTC"))
+    return parsed.astimezone(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or load_settings()
     db = Database(settings)
     db.initialize()
 
@@ -51,6 +65,9 @@ def create_app() -> FastAPI:
     def dashboard(request: Request):
         pause_until = scheduler.twitter_pause_until()
         latest_scan = db.get_latest_scan()
+        if latest_scan:
+            latest_scan["started_at_taipei"] = _taipei_time(latest_scan.get("started_at"))
+            latest_scan["finished_at_taipei"] = _taipei_time(latest_scan.get("finished_at"))
         return app.state.templates.TemplateResponse(
             request,
             "dashboard.html",

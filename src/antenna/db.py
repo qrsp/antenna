@@ -254,17 +254,23 @@ class Database:
                 ),
             )
 
-    def list_videos(self, process: str = PROCESS_UNCHECK) -> list[dict[str, Any]]:
+    def list_videos(self, process: str = PROCESS_UNCHECK, *, limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
         if process not in VALID_PROCESS:
             raise ValueError("invalid process")
+        params: list[Any] = [process]
+        limit_clause = ""
+        if limit is not None:
+            limit_clause = "LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
         with self.connect() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT * FROM youtube
                 WHERE process = ?
                 ORDER BY COALESCE(start_at, created_at) DESC
+                {limit_clause}
                 """,
-                (process,),
+                params,
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -288,3 +294,14 @@ class Database:
                 )
                 count += cursor.rowcount
         return count
+
+    def update_all_video_process(self, from_process: str, to_process: str) -> int:
+        if from_process not in VALID_PROCESS or to_process not in VALID_PROCESS:
+            raise ValueError("invalid process")
+        now = dt_to_db(utcnow())
+        with self.connect() as conn:
+            cursor = conn.execute(
+                "UPDATE youtube SET process = ?, updated_at = ? WHERE process = ?",
+                (to_process, now, from_process),
+            )
+            return cursor.rowcount
