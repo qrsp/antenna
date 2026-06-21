@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import requests
+import httpx
 
 from antenna.config import Settings
 
@@ -20,9 +20,9 @@ class ThumbnailService:
         if target.exists() and target.stat().st_size > 0:
             return self._static_path(target)
         try:
-            response = requests.get(thumbnail_url, timeout=20)
+            response = httpx.get(thumbnail_url, timeout=20)
             response.raise_for_status()
-        except requests.RequestException:
+        except httpx.HTTPError:
             return None
         target.write_bytes(response.content)
         return self._static_path(target)
