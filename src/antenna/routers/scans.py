@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import UTC
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -8,7 +8,6 @@ from fastapi.responses import RedirectResponse
 
 from antenna.db import db_to_dt, utcnow
 from antenna.schemas import ScanRequest, ScanResponse
-
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
@@ -44,7 +43,7 @@ def _days_since(value: str | None) -> int | None:
     if parsed is None:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return max(0, (utcnow() - parsed).days)
 
 
@@ -75,7 +74,7 @@ def _sort_datetime(value):
     if isinstance(value, str):
         value = db_to_dt(value)
     if value is not None and value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
+        value = value.replace(tzinfo=UTC)
     return value
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
 from dateutil import parser as date_parser
@@ -98,14 +98,14 @@ class YoutubeService:
             if value is None:
                 continue
             if isinstance(value, int | float):
-                return datetime.fromtimestamp(value, tz=timezone.utc)
+                return datetime.fromtimestamp(value, tz=UTC)
             if isinstance(value, str):
                 try:
                     if len(value) == 8 and value.isdigit():
-                        return datetime.strptime(value, "%Y%m%d").replace(tzinfo=timezone.utc)
+                        return datetime.strptime(value, "%Y%m%d").replace(tzinfo=UTC)
                     parsed = date_parser.parse(value)
                     if parsed.tzinfo is None:
-                        parsed = parsed.replace(tzinfo=timezone.utc)
+                        parsed = parsed.replace(tzinfo=UTC)
                     return parsed
                 except (ValueError, TypeError):
                     continue

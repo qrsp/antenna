@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from dateutil import parser as date_parser
 
-from antenna.config import TwitterConfig
+from antenna.config import TWITTER_COOKIES_ENV, TwitterConfig
 from antenna.models import TweetRecord
-from antenna.services.tweety_compat import patch_tweety_transaction_loader
 
 
 class TwitterRateLimitError(RuntimeError):
@@ -84,9 +83,8 @@ class TwitterService:
 
     def _create_app(self):
         if not self.config.has_cookies:
-            raise RuntimeError(f"{self.config.cookies_env} is not configured")
+            raise RuntimeError(f"{TWITTER_COOKIES_ENV} is not configured")
         try:
-            patch_tweety_transaction_loader()
             from tweety import Twitter
         except ImportError as exc:
             raise RuntimeError("tweety-ns is required to fetch Twitter timelines") from exc
@@ -124,17 +122,17 @@ class TwitterService:
     def _created_at(self, value: Any) -> datetime:
         if isinstance(value, datetime):
             if value.tzinfo is None:
-                return value.replace(tzinfo=timezone.utc)
+                return value.replace(tzinfo=UTC)
             return value
         if value:
             try:
                 parsed = date_parser.parse(str(value))
                 if parsed.tzinfo is None:
-                    parsed = parsed.replace(tzinfo=timezone.utc)
+                    parsed = parsed.replace(tzinfo=UTC)
                 return parsed
             except ValueError:
                 pass
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     def _extract_urls(self, raw: Any) -> list[str]:
         urls: list[str] = []

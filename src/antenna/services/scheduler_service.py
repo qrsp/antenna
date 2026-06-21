@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from antenna.config import SchedulerConfig
 from antenna.db import Database, db_to_dt, dt_to_db, utcnow
-
 
 TWITTER_PAUSE_KEY = "twitter_pause_until"
 
@@ -68,7 +67,7 @@ class SchedulerService:
         if last_tweet_at is None:
             return "active_account_interval"
         inactive_after = timedelta(days=self.config.inactive_after_days)
-        if current - last_tweet_at.astimezone(timezone.utc) >= inactive_after:
+        if current - last_tweet_at.astimezone(UTC) >= inactive_after:
             return "inactive_account_interval"
         return "active_account_interval"
 
@@ -80,11 +79,7 @@ class SchedulerService:
         limit_accounts: list[str] | None = None,
     ) -> tuple[list[str], list[AccountDecision]]:
         allowed = set(limit_accounts or accounts)
-        decisions = [
-            self.decide_account(account, force=force)
-            for account in accounts
-            if account in allowed
-        ]
+        decisions = [self.decide_account(account, force=force) for account in accounts if account in allowed]
         return [item.username for item in decisions if item.should_scan], decisions
 
     def compute_deferred_until(
@@ -99,7 +94,7 @@ class SchedulerService:
         else:
             current = now or utcnow()
             inactive_after = timedelta(days=self.config.inactive_after_days)
-            if current - last_tweet_at.astimezone(timezone.utc) >= inactive_after:
+            if current - last_tweet_at.astimezone(UTC) >= inactive_after:
                 minutes = self.config.inactive_account_interval_minutes
             else:
                 minutes = self.config.active_account_interval_minutes

@@ -120,10 +120,7 @@ def test_account_scan_state_schema_drops_updated_at(tmp_path):
     db.initialize()
 
     with db.connect() as conn:
-        column_names = {
-            row["name"]
-            for row in conn.execute("PRAGMA table_info(account_scan_state)").fetchall()
-        }
+        column_names = {row["name"] for row in conn.execute("PRAGMA table_info(account_scan_state)").fetchall()}
 
     assert "updated_at" not in column_names
     assert "last_status_id" in column_names
@@ -193,11 +190,17 @@ def test_twitter_history_migrates_to_account_scan_cursor(tmp_path):
             (older, older, older),
         )
         conn.execute(
-            "INSERT INTO twitter (status_id, user_screen_name, in_timeline, created_at) VALUES ('100', 'example', 1, ?)",
+            """
+            INSERT INTO twitter (status_id, user_screen_name, in_timeline, created_at)
+            VALUES ('100', 'example', 1, ?)
+            """,
             (older,),
         )
         conn.execute(
-            "INSERT INTO twitter (status_id, user_screen_name, in_timeline, created_at) VALUES ('200', 'example', 1, ?)",
+            """
+            INSERT INTO twitter (status_id, user_screen_name, in_timeline, created_at)
+            VALUES ('200', 'example', 1, ?)
+            """,
             (newer,),
         )
 

@@ -8,7 +8,6 @@ from fastapi.responses import RedirectResponse
 from antenna.models import LIBRARY_ARCHIVED, LIBRARY_NEW, VALID_LIBRARY_STATES
 from antenna.schemas import BulkLibraryStateUpdateRequest, LibraryStateUpdateRequest, VideoResponse
 
-
 router = APIRouter(tags=["videos"])
 
 

@@ -109,4 +109,3 @@ class AutoScanService:
                 return pause_until
             return utcnow()
         return started_at + interval
-

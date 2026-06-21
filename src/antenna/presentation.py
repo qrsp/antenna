@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-
-from markupsafe import Markup, escape
 from zoneinfo import ZoneInfo
 
+from markupsafe import Markup, escape
 
 UTC_TZ = ZoneInfo("UTC")
 

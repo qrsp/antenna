@@ -13,7 +13,7 @@
   <h2>Twitter</h2>
   <table>
     <tbody>
-      <tr><th>Cookie env</th><td>{{ settings.twitter.cookies_env }}</td></tr>
+      <tr><th>Cookie env</th><td>ANTENNA_TWITTER_COOKIES</td></tr>
       <tr><th>Cookie configured</th><td>{{ "Yes" if settings.twitter.has_cookies else "No" }}</td></tr>
       <tr><th>Pause until</th><td>{{ pause_until | local_time if pause_until else "None" }}</td></tr>
     </tbody>

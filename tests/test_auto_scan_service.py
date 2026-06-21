@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from antenna.config import SchedulerConfig
 from antenna.db import Database, dt_to_db, utcnow
@@ -133,7 +133,7 @@ def test_auto_scan_wakes_and_recalculates_when_pause_changes(tmp_path, monkeypat
     scheduler = SchedulerService(db, config)
     scanner = FakeScanner()
     service = AutoScanService(scanner, scheduler)
-    base = datetime(2026, 6, 19, 9, 3, 9, tzinfo=timezone.utc)
+    base = datetime(2026, 6, 19, 9, 3, 9, tzinfo=UTC)
     current = base + timedelta(minutes=1)
 
     scan_id = db.create_scan()

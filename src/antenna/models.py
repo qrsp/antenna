@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-
 LIBRARY_ARCHIVED = "archived"
 LIBRARY_NEW = "new"
 VALID_LIBRARY_STATES = {LIBRARY_ARCHIVED, LIBRARY_NEW}

@@ -4,7 +4,7 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,15 +13,15 @@ from antenna.models import LIBRARY_NEW, VALID_LIBRARY_STATES, TweetRecord, Youtu
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def dt_to_db(value: datetime | None) -> str | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc).isoformat()
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat()
 
 
 def db_to_dt(value: str | None) -> datetime | None:
@@ -62,10 +62,7 @@ class Database:
                 """
             )
             self._migrate_legacy_video_library_state(conn)
-            applied = {
-                row["name"]
-                for row in conn.execute("SELECT name FROM schema_migrations").fetchall()
-            }
+            applied = {row["name"] for row in conn.execute("SELECT name FROM schema_migrations").fetchall()}
             for migration_path in sorted(migration_dir.glob("*.sql")):
                 if migration_path.name in applied:
                     continue
@@ -405,7 +402,13 @@ class Database:
                 ),
             )
 
-    def list_videos(self, state: str = LIBRARY_NEW, *, limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
+    def list_videos(
+        self,
+        state: str = LIBRARY_NEW,
+        *,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         if state not in VALID_LIBRARY_STATES:
             raise ValueError("invalid library state")
         params: list[Any] = [state]

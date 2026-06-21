@@ -13,7 +13,8 @@ from antenna.config import Settings, load_settings
 from antenna.db import Database
 from antenna.models import LIBRARY_ARCHIVED, LIBRARY_NEW
 from antenna.presentation import local_time
-from antenna.routers import health, scans, settings as settings_router, videos
+from antenna.routers import health, scans, videos
+from antenna.routers import settings as settings_router
 from antenna.services.auto_scan_service import AutoScanService
 from antenna.services.library_service import LibraryService
 from antenna.services.scan_service import ScanService
