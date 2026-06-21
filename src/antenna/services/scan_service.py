@@ -14,6 +14,12 @@ from antenna.services.twitter_service import TwitterRateLimitError, TwitterServi
 from antenna.services.youtube_service import YoutubeMetadataUnavailable, YoutubeService
 
 
+class ScanAlreadyRunningError(RuntimeError):
+    def __init__(self, running_scan: dict[str, Any] | None):
+        super().__init__("scan already running")
+        self.running_scan = running_scan
+
+
 class ScanService:
     def __init__(
         self,
@@ -32,6 +38,7 @@ class ScanService:
         self.thumbnails = thumbnails
         self.logger = get_logger("antenna.scan")
         self._lock = threading.Lock()
+        self._cancel_event = threading.Event()
         self._schedule_changed: Callable[[], None] | None = None
 
     def set_schedule_changed_callback(self, callback: Callable[[], None]) -> None:
@@ -39,11 +46,9 @@ class ScanService:
 
     def start(self, *, force: bool = False, limit_accounts: list[str] | None = None) -> dict[str, Any]:
         if not self._lock.acquire(blocking=False):
-            running = self.db.get_running_scan()
-            if running is not None:
-                return running
-            return {"id": 0, "status": "running", "message": "scan already running", "stats": {}}
+            raise ScanAlreadyRunningError(self.db.get_running_scan())
 
+        self._cancel_event.clear()
         scan_id = self.db.create_scan()
         thread = threading.Thread(
             target=self._run_with_acquired_lock,
@@ -55,15 +60,24 @@ class ScanService:
 
     def run(self, *, force: bool = False, limit_accounts: list[str] | None = None) -> dict[str, Any]:
         if not self._lock.acquire(blocking=False):
-            running = self.db.get_running_scan()
-            if running is not None:
-                return running
-            return {"id": 0, "status": "running", "message": "scan already running", "stats": {}}
+            raise ScanAlreadyRunningError(self.db.get_running_scan())
+        self._cancel_event.clear()
         scan_id = self.db.create_scan()
         return self._run_with_acquired_lock(scan_id=scan_id, force=force, limit_accounts=limit_accounts)
 
     def is_running(self) -> bool:
         return self._lock.locked()
+
+    def cancel(self) -> dict[str, Any] | None:
+        if not self.is_running():
+            return None
+        self._cancel_event.set()
+        running = self.db.get_running_scan()
+        if running is not None:
+            stats = running.get("stats") or {}
+            self.db.update_scan(running["id"], message="Cancelling scan", stats=stats)
+            return self.db.get_scan(running["id"])
+        return None
 
     def _run_with_acquired_lock(self, *, scan_id: int, force: bool, limit_accounts: list[str] | None) -> dict[str, Any]:
         try:
@@ -109,11 +123,21 @@ class ScanService:
                     )
 
             for username in accounts:
+                if self._cancel_event.is_set():
+                    stats["current_account"] = None
+                    message = "Scan cancelled"
+                    self.db.finish_scan(scan_id, "cancelled", message, stats)
+                    return {"id": scan_id, "status": "cancelled", "message": message, "stats": stats}
                 stats["current_account"] = username
                 self.db.update_scan(scan_id, message=f"Scanning {username}", stats=stats)
                 try:
                     self._scan_account(username, stats)
                     stats["accounts_scanned"] += 1
+                    if self._cancel_event.is_set():
+                        stats["current_account"] = None
+                        message = "Scan cancelled"
+                        self.db.finish_scan(scan_id, "cancelled", message, stats)
+                        return {"id": scan_id, "status": "cancelled", "message": message, "stats": stats}
                     self.db.update_scan(scan_id, message=f"Finished {username}", stats=stats)
                 except TwitterRateLimitError as exc:
                     pause_until = self.scheduler.pause_for_rate_limit()

@@ -8,6 +8,7 @@
     <p>Creators, channels, and accounts that feed new content signals into your library.</p>
   </div>
 </section>
+<div class="notice" id="scan-notice" role="status" aria-live="polite" hidden></div>
 
 <section class="table-wrap">
   <div class="section-toolbar">
@@ -82,9 +83,9 @@
         </td>
         <td>
           {% if account.can_scan %}
-          <form action="/accounts/scan" method="post">
+          <form action="/accounts/scan" method="post" data-account-scan-form>
             <input type="hidden" name="username" value="{{ account.user_screen_name }}">
-            <button class="button secondary compact" type="submit">Scan</button>
+            <button class="button secondary compact account-scan-button" type="submit" {% if scan_running %}disabled{% endif %}>Scan</button>
           </form>
           {% else %}
           <span class="muted">Not configured</span>
@@ -114,5 +115,72 @@
       if (event.target === dialog) dialog.close();
     });
   });
+
+  const scanNotice = document.querySelector("#scan-notice");
+  const accountScanButtons = document.querySelectorAll(".account-scan-button");
+
+  function showScanNotice(message, tone = "info") {
+    if (!scanNotice) return;
+    scanNotice.textContent = message;
+    scanNotice.dataset.tone = tone;
+    scanNotice.hidden = false;
+  }
+
+  function setAccountScanButtons(running) {
+    accountScanButtons.forEach((button) => {
+      button.disabled = running;
+    });
+  }
+
+  async function refreshScanStatus() {
+    try {
+      const response = await fetch("/api/scans/status", { headers: { "Accept": "application/json" } });
+      if (!response.ok) return;
+      const payload = await response.json();
+      setAccountScanButtons(Boolean(payload.running));
+    } catch (error) {
+      console.debug("scan status refresh failed", error);
+    }
+  }
+
+  document.querySelectorAll("[data-account-scan-form]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const username = form.querySelector("input[name='username']")?.value;
+      if (!username) return;
+      setAccountScanButtons(true);
+      try {
+        const response = await fetch("/api/scans", {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ force: true, limit_accounts: [username] }),
+        });
+        const payload = await response.json();
+        if (response.status === 409 && payload.detail?.error === "scan_in_progress") {
+          showScanNotice(payload.detail.message || "A scan is already running.", "warning");
+          return;
+        }
+        if (!response.ok) {
+          showScanNotice(payload.detail || "Scan could not be started.", "error");
+          await refreshScanStatus();
+          return;
+        }
+        showScanNotice(`Force scan started for ${username}.`, "success");
+      } catch (error) {
+        showScanNotice("Scan could not be started.", "error");
+        await refreshScanStatus();
+      }
+    });
+  });
+
+  if (new URLSearchParams(window.location.search).get("scan_error") === "in_progress") {
+    showScanNotice("A scan is already running.", "warning");
+  }
+
+  setInterval(refreshScanStatus, 3000);
+  refreshScanStatus();
 </script>
 {% endblock %}

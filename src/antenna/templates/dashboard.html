@@ -8,14 +8,18 @@
     <p>Track scan status, new content signals, and the next sweep across your followed sources.</p>
   </div>
   <div class="actions">
-    <form action="/scans" method="post">
-      <button class="button" type="submit">Start Scan</button>
+    <form action="/scans" method="post" data-scan-form data-force="false">
+      <button class="button scan-start-button" type="submit" {% if scan_running %}disabled{% endif %}>Start Scan</button>
     </form>
-    <form action="/scans/force" method="post">
-      <button class="button secondary" type="submit">Force Scan</button>
+    <form action="/scans/force" method="post" data-scan-form data-force="true">
+      <button class="button secondary scan-start-button" type="submit" {% if scan_running %}disabled{% endif %}>Force Scan</button>
+    </form>
+    <form action="/scans/cancel" method="post" data-cancel-scan-form>
+      <button class="button secondary" id="cancel-scan-button" type="submit" {% if not scan_running %}disabled{% endif %}>Cancel Scan</button>
     </form>
   </div>
 </section>
+<div class="notice" id="scan-notice" role="status" aria-live="polite" hidden></div>
 
 <section class="metrics">
   <div class="metric">
@@ -64,9 +68,30 @@
   const progressText = document.querySelector("#scan-progress-text");
   const newCountEl = document.querySelector("#new-count");
   const archivedCountEl = document.querySelector("#archived-count");
+  const scanNotice = document.querySelector("#scan-notice");
+  const scanStartButtons = document.querySelectorAll(".scan-start-button");
+  const cancelScanButton = document.querySelector("#cancel-scan-button");
+
+  function showScanNotice(message, tone = "info") {
+    if (!scanNotice) return;
+    scanNotice.textContent = message;
+    scanNotice.dataset.tone = tone;
+    scanNotice.hidden = false;
+  }
+
+  function setScanControls(running) {
+    scanStartButtons.forEach((button) => {
+      button.disabled = running;
+    });
+    if (cancelScanButton) {
+      cancelScanButton.disabled = !running;
+    }
+  }
 
   function renderScan(scan) {
-    if (!statusEl || !scan) return;
+    if (!scan) return;
+    setScanControls(scan.status === "running");
+    if (!statusEl) return;
     const stats = scan.stats || {};
     statusEl.textContent = scan.status || "";
     messageEl.textContent = scan.message || "";
@@ -98,6 +123,65 @@
     } catch (error) {
       console.debug("scan refresh failed", error);
     }
+  }
+
+  document.querySelectorAll("[data-scan-form]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setScanControls(true);
+      try {
+        const response = await fetch("/api/scans", {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ force: form.dataset.force === "true" }),
+        });
+        const payload = await response.json();
+        if (response.status === 409 && payload.detail?.error === "scan_in_progress") {
+          showScanNotice(payload.detail.message || "A scan is already running.", "warning");
+          renderScan(payload.detail.scan);
+          return;
+        }
+        if (!response.ok) {
+          showScanNotice(payload.detail || "Scan could not be started.", "error");
+          await refreshLatestScan();
+          return;
+        }
+        showScanNotice("Scan started.", "success");
+        renderScan(payload);
+      } catch (error) {
+        showScanNotice("Scan could not be started.", "error");
+        await refreshLatestScan();
+      }
+    });
+  });
+
+  document.querySelector("[data-cancel-scan-form]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (cancelScanButton) cancelScanButton.disabled = true;
+    try {
+      const response = await fetch("/api/scans/cancel", {
+        method: "POST",
+        headers: { "Accept": "application/json" },
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        showScanNotice(payload.detail?.message || "No scan is currently running.", "warning");
+        await refreshLatestScan();
+        return;
+      }
+      showScanNotice("Scan cancellation requested.", "success");
+      renderScan(payload);
+    } catch (error) {
+      showScanNotice("Scan could not be cancelled.", "error");
+      await refreshLatestScan();
+    }
+  });
+
+  if (new URLSearchParams(window.location.search).get("scan_error") === "in_progress") {
+    showScanNotice("A scan is already running.", "warning");
   }
 
   setInterval(refreshLatestScan, 3000);

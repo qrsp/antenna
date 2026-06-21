@@ -1,4 +1,6 @@
 import asyncio
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 
 from antenna.config import SchedulerConfig
@@ -56,6 +58,19 @@ class RateLimitOnTwitter:
         self.calls.append(username)
         if username == self.rate_limited_username:
             raise TwitterRateLimitError("rate limited")
+        return []
+
+
+class BlockingTwitter:
+    def __init__(self):
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.calls = []
+
+    def fetch_tweets(self, username, *, since_status_id=None, max_tweets=None):
+        self.calls.append(username)
+        self.started.set()
+        assert self.release.wait(timeout=1)
         return []
 
 
@@ -206,6 +221,35 @@ def test_scan_rate_limit_persists_resume_state_and_notifies_schedule_changed(tmp
     assert resume["limit_accounts"] == ["limited_account", "after_account"]
     assert twitter.calls == ["first_account", "limited_account"]
     assert scheduler.twitter_pause_until() is not None
+
+
+def test_scan_can_be_cancelled_while_running(tmp_path):
+    config = SchedulerConfig()
+    settings = ScanSettings(tmp_path / "test.db", config, ["first_account", "second_account"])
+    db = Database(settings)
+    db.initialize()
+    scheduler = SchedulerService(db, config)
+    twitter = BlockingTwitter()
+    scanner = ScanService(settings, db, scheduler, twitter, NullYoutube(), NullThumbnails())
+
+    result = scanner.start(force=True)
+    assert result["status"] == "running"
+    assert twitter.started.wait(timeout=1)
+
+    cancelling = scanner.cancel()
+    assert cancelling is not None
+    assert cancelling["message"] == "Cancelling scan"
+    twitter.release.set()
+
+    deadline = time.monotonic() + 1
+    while scanner.is_running() and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    latest = db.get_latest_scan()
+    assert latest is not None
+    assert latest["status"] == "cancelled"
+    assert latest["message"] == "Scan cancelled"
+    assert twitter.calls == ["first_account"]
 
 
 def test_scan_after_expired_pause_can_defer_all_accounts_by_minimum_interval(tmp_path):

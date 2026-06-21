@@ -6,6 +6,7 @@ from antenna.app import create_app
 from antenna.config import AppConfig, ListsConfig, Settings
 from antenna.db import dt_to_db, utcnow
 from antenna.models import YoutubeMetadata
+from antenna.services.scan_service import ScanAlreadyRunningError
 
 
 def make_app(tmp_path, *, follow=None):
@@ -22,10 +23,27 @@ def make_app(tmp_path, *, follow=None):
 class RecordingScanner:
     def __init__(self):
         self.calls = []
+        self.cancelled = False
 
     def start(self, *, force=False, limit_accounts=None):
         self.calls.append({"force": force, "limit_accounts": limit_accounts})
         return {"id": 1, "status": "running", "stats": {}}
+
+    def cancel(self):
+        self.cancelled = True
+        return {"id": 1, "status": "running", "message": "Cancelling scan", "stats": {}}
+
+    def is_running(self):
+        return False
+
+
+class BusyScanner(RecordingScanner):
+    def start(self, *, force=False, limit_accounts=None):
+        self.calls.append({"force": force, "limit_accounts": limit_accounts})
+        raise ScanAlreadyRunningError({"id": 7, "status": "running", "stats": {}})
+
+    def is_running(self):
+        return True
 
 
 def test_dashboard_latest_scan_uses_local_time(tmp_path):
@@ -70,6 +88,31 @@ def test_scan_forms_start_regular_and_force_scans(tmp_path):
         {"force": False, "limit_accounts": None},
         {"force": True, "limit_accounts": None},
     ]
+
+
+def test_scan_api_returns_conflict_when_scan_is_running(tmp_path):
+    app = make_app(tmp_path)
+    app.state.scanner = BusyScanner()
+    client = TestClient(app)
+
+    response = client.post("/api/scans", json={"force": True})
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["error"] == "scan_in_progress"
+    assert response.json()["detail"]["scan"]["id"] == 7
+
+
+def test_cancel_scan_api_requests_cancellation(tmp_path):
+    app = make_app(tmp_path)
+    scanner = RecordingScanner()
+    app.state.scanner = scanner
+    client = TestClient(app)
+
+    response = client.post("/api/scans/cancel")
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Cancelling scan"
+    assert scanner.cancelled is True
 
 
 def test_archived_page_paginates_and_archive_all_updates_new_queue(tmp_path):
@@ -193,6 +236,7 @@ def test_accounts_page_lists_scan_state_and_scan_button(tmp_path):
     assert "Updated" not in response.text
     assert "<td>2</td>" in response.text
     assert 'action="/accounts/scan"' in response.text
+    assert "Scan" in response.text
     assert "data-local-time" in response.text
 
 

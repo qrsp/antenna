@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 
 from antenna.db import db_to_dt, utcnow
 from antenna.schemas import ScanRequest, ScanResponse
+from antenna.services.scan_service import ScanAlreadyRunningError
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
@@ -14,8 +15,42 @@ router = APIRouter(prefix="/api/scans", tags=["scans"])
 @router.post("", response_model=ScanResponse)
 def create_scan(payload: ScanRequest, request: Request) -> ScanResponse:
     scanner = request.app.state.scanner
-    result = scanner.start(force=payload.force, limit_accounts=payload.limit_accounts)
+    _validate_limit_accounts(payload.limit_accounts, request)
+    try:
+        result = scanner.start(force=payload.force, limit_accounts=payload.limit_accounts)
+    except ScanAlreadyRunningError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "scan_in_progress",
+                "message": "A scan is already running.",
+                "scan": exc.running_scan,
+            },
+        ) from exc
     return ScanResponse(**result)
+
+
+@router.post("/cancel", response_model=ScanResponse)
+def cancel_scan(request: Request) -> ScanResponse:
+    result = request.app.state.scanner.cancel()
+    if result is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "no_scan_running",
+                "message": "No scan is currently running.",
+            },
+        )
+    return ScanResponse(**result)
+
+
+@router.get("/status")
+def scan_status(request: Request):
+    latest = request.app.state.db.get_latest_scan()
+    return {
+        "running": request.app.state.scanner.is_running(),
+        "latest": latest,
+    }
 
 
 @router.get("/latest")
@@ -57,6 +92,15 @@ ACCOUNT_SORT_OPTIONS = {
     "last_error": "Error",
 }
 ACCOUNT_SORT_DIRECTIONS = {"asc", "desc"}
+
+
+def _validate_limit_accounts(limit_accounts: list[str] | None, request: Request) -> None:
+    if not limit_accounts:
+        return
+    configured = set(request.app.state.settings.lists.follow)
+    unknown = [username for username in limit_accounts if username not in configured]
+    if unknown:
+        raise HTTPException(status_code=400, detail="account must be in the follow list")
 
 
 def _normalized_sort(sort: str, direction: str) -> tuple[str, str]:
@@ -115,13 +159,25 @@ def _sort_accounts(rows: list[dict], sort: str, direction: str) -> list[dict]:
 
 @page_router.post("/scans")
 def create_scan_form(request: Request):
-    request.app.state.scanner.start(force=False, limit_accounts=None)
+    try:
+        request.app.state.scanner.start(force=False, limit_accounts=None)
+    except ScanAlreadyRunningError:
+        return RedirectResponse(url="/?scan_error=in_progress", status_code=303)
     return RedirectResponse(url="/", status_code=303)
 
 
 @page_router.post("/scans/force")
 def create_force_scan_form(request: Request):
-    request.app.state.scanner.start(force=True, limit_accounts=None)
+    try:
+        request.app.state.scanner.start(force=True, limit_accounts=None)
+    except ScanAlreadyRunningError:
+        return RedirectResponse(url="/?scan_error=in_progress", status_code=303)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@page_router.post("/scans/cancel")
+def cancel_scan_form(request: Request):
+    request.app.state.scanner.cancel()
     return RedirectResponse(url="/", status_code=303)
 
 
@@ -168,6 +224,7 @@ def account_scan_states_page(request: Request, sort: str = "user_screen_name", d
             "sort": sort,
             "direction": direction,
             "sort_options": ACCOUNT_SORT_OPTIONS,
+            "scan_running": request.app.state.scanner.is_running(),
         },
     )
 
@@ -180,5 +237,8 @@ def scan_single_account_form(
     username = username.strip()
     if username not in request.app.state.settings.lists.follow:
         raise HTTPException(status_code=400, detail="account must be in the follow list")
-    request.app.state.scanner.start(force=True, limit_accounts=[username])
+    try:
+        request.app.state.scanner.start(force=True, limit_accounts=[username])
+    except ScanAlreadyRunningError:
+        return RedirectResponse(url="/accounts?scan_error=in_progress", status_code=303)
     return RedirectResponse(url="/", status_code=303)

@@ -78,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "latest_scan": latest_scan,
                 "next_scan_at": next_scan_at,
                 "settings": settings,
+                "scan_running": app.state.scanner.is_running(),
             },
         )
 

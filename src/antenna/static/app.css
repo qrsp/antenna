@@ -221,6 +221,30 @@ h2 {
   justify-content: flex-end;
 }
 
+.notice {
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.notice[data-tone="success"] {
+  border-color: rgba(72, 211, 163, 0.4);
+  background: rgba(72, 211, 163, 0.12);
+}
+
+.notice[data-tone="warning"] {
+  border-color: rgba(255, 202, 87, 0.42);
+  background: rgba(255, 202, 87, 0.12);
+}
+
+.notice[data-tone="error"] {
+  border-color: rgba(255, 101, 130, 0.42);
+  background: rgba(255, 101, 130, 0.12);
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -480,6 +504,17 @@ td {
 
 .button.secondary:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+.button:disabled,
+.button:disabled:hover,
+.button.secondary:disabled,
+.button.secondary:disabled:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #777d90;
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.72;
 }
 
 .button.compact {
