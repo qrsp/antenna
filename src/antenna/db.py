@@ -61,7 +61,6 @@ class Database:
                 )
                 """
             )
-            self._migrate_legacy_video_library_state(conn)
             applied = {row["name"] for row in conn.execute("SELECT name FROM schema_migrations").fetchall()}
             for migration_path in sorted(migration_dir.glob("*.sql")):
                 if migration_path.name in applied:
@@ -71,85 +70,6 @@ class Database:
                     "INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)",
                     (migration_path.name, dt_to_db(utcnow())),
                 )
-
-    def _migrate_legacy_video_library_state(self, conn: sqlite3.Connection) -> None:
-        table = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'youtube'",
-        ).fetchone()
-        if table is None:
-            return
-
-        columns = {row["name"] for row in conn.execute("PRAGMA table_info(youtube)").fetchall()}
-        if "library_state" in columns:
-            return
-        if "process" not in columns:
-            return
-
-        conn.execute("DROP INDEX IF EXISTS idx_youtube_process_start_at")
-        conn.execute("DROP INDEX IF EXISTS idx_youtube_process_sort_at")
-        conn.execute(
-            """
-            CREATE TABLE youtube_migrated (
-                url TEXT NOT NULL,
-                video_id TEXT NOT NULL,
-                title TEXT,
-                channel_id TEXT,
-                channel_name TEXT,
-                start_at TIMESTAMP,
-                media_type TEXT,
-                status TEXT NOT NULL,
-                library_state TEXT NOT NULL DEFAULT 'new',
-                thumbnail_path TEXT,
-                metadata_json TEXT,
-                created_at TIMESTAMP NOT NULL,
-                updated_at TIMESTAMP NOT NULL,
-                PRIMARY KEY (url),
-                FOREIGN KEY (url)
-                    REFERENCES urls (url)
-                    ON DELETE CASCADE
-                    ON UPDATE CASCADE,
-                CHECK (library_state IN ('archived', 'new'))
-            )
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO youtube_migrated (
-                url, video_id, title, channel_id, channel_name, start_at, media_type,
-                status, library_state, thumbnail_path, metadata_json, created_at, updated_at
-            )
-            SELECT
-                url,
-                video_id,
-                title,
-                channel_id,
-                channel_name,
-                start_at,
-                media_type,
-                status,
-                CASE process WHEN 'checked' THEN 'archived' ELSE 'new' END,
-                thumbnail_path,
-                metadata_json,
-                created_at,
-                updated_at
-            FROM youtube
-            """
-        )
-        conn.execute("DROP TABLE youtube")
-        conn.execute("ALTER TABLE youtube_migrated RENAME TO youtube")
-        conn.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_youtube_library_state_start_at
-            ON youtube (library_state, start_at DESC)
-            """
-        )
-        conn.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_youtube_library_state_sort_at
-            ON youtube (library_state, COALESCE(start_at, created_at) DESC)
-            """
-        )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_youtube_video_id ON youtube (video_id)")
 
     def ping(self) -> bool:
         with self.connect() as conn:
