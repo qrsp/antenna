@@ -14,6 +14,7 @@
 
 <form action="/videos/process" method="post">
   <input type="hidden" name="process" value="{{ 'checked' if process == 'uncheck' else 'uncheck' }}">
+  <input type="hidden" name="return_process" value="{{ process }}">
   <div class="bulkbar">
     {% if process == 'uncheck' and videos %}
     <button class="button secondary" type="button" data-select-all>Select all</button>

@@ -112,10 +112,11 @@ class ScanService:
                     self.db.update_scan(scan_id, message=f"Finished {username}", stats=stats)
                 except TwitterRateLimitError as exc:
                     pause_until = self.scheduler.pause_for_rate_limit()
+                    state = self.db.get_account_state(username) or {}
                     self.db.upsert_account_state(
                         username,
-                        last_scan_at=utcnow(),
-                        last_tweet_at=None,
+                        last_scan_at=db_to_dt(state.get("last_scan_at")),
+                        last_tweet_at=db_to_dt(state.get("last_tweet_at")),
                         next_scan_after=None,
                         last_status="rate_limited",
                         last_error=str(exc),

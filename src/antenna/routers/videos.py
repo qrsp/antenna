@@ -42,6 +42,14 @@ def api_list_videos(
     return [_video_response(row) for row in request.app.state.review.list_videos(process, limit=per_page, offset=offset)]
 
 
+@router.get("/api/videos/counts")
+def api_video_counts(request: Request):
+    return {
+        "uncheck": request.app.state.db.count_videos("uncheck"),
+        "checked": request.app.state.db.count_videos("checked"),
+    }
+
+
 @router.patch("/api/videos/{url:path}/process")
 def api_update_video_process(url: str, payload: ProcessUpdateRequest, request: Request):
     count = request.app.state.review.update_process([unquote(url)], payload.process)
@@ -87,15 +95,18 @@ def videos_page(
 def update_video_process_form(
     request: Request,
     process: str = Form(...),
+    return_process: str = Form("uncheck"),
     urls: list[str] | None = Form(default=None),
 ):
     if process not in VALID_PROCESS:
         raise HTTPException(status_code=400, detail="process must be checked or uncheck")
+    if return_process not in VALID_PROCESS:
+        raise HTTPException(status_code=400, detail="return_process must be checked or uncheck")
     request.app.state.review.update_process(urls or [], process)
-    return RedirectResponse(url=f"/videos?process={process}", status_code=303)
+    return RedirectResponse(url=f"/videos?process={return_process}", status_code=303)
 
 
 @router.post("/videos/check-all")
 def check_all_unchecked(request: Request):
     request.app.state.review.update_all("uncheck", "checked")
-    return RedirectResponse(url="/videos?process=checked", status_code=303)
+    return RedirectResponse(url="/videos?process=uncheck", status_code=303)

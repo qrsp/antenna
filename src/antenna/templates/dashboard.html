@@ -14,11 +14,11 @@
 <section class="metrics">
   <div class="metric">
     <span class="metric-label">Uncheck</span>
-    <strong>{{ unchecked_count }}</strong>
+    <strong id="unchecked-count">{{ unchecked_count }}</strong>
   </div>
   <div class="metric">
     <span class="metric-label">Checked</span>
-    <strong>{{ checked_count }}</strong>
+    <strong id="checked-count">{{ checked_count }}</strong>
   </div>
   <div class="metric">
     <span class="metric-label">Rate Limit Pause</span>
@@ -56,6 +56,8 @@
   const messageEl = document.querySelector("#scan-message");
   const progressBar = document.querySelector("#scan-progress-bar");
   const progressText = document.querySelector("#scan-progress-text");
+  const uncheckedCountEl = document.querySelector("#unchecked-count");
+  const checkedCountEl = document.querySelector("#checked-count");
 
   function renderScan(scan) {
     if (!statusEl || !scan) return;
@@ -74,11 +76,18 @@
   }
 
   async function refreshLatestScan() {
-    if (!statusEl) return;
     try {
-      const response = await fetch("/api/scans/latest", { headers: { "Accept": "application/json" } });
-      if (response.ok) {
-        renderScan(await response.json());
+      const [scanResponse, countsResponse] = await Promise.all([
+        fetch("/api/scans/latest", { headers: { "Accept": "application/json" } }),
+        fetch("/api/videos/counts", { headers: { "Accept": "application/json" } }),
+      ]);
+      if (scanResponse.ok) {
+        renderScan(await scanResponse.json());
+      }
+      if (countsResponse.ok) {
+        const counts = await countsResponse.json();
+        uncheckedCountEl.textContent = counts.uncheck;
+        checkedCountEl.textContent = counts.checked;
       }
     } catch (error) {
       console.debug("scan refresh failed", error);

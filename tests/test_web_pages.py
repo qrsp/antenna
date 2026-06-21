@@ -55,6 +55,7 @@ def test_checked_page_paginates_and_check_all_updates_review_queue(tmp_path):
 
     check_all = client.post("/videos/check-all", follow_redirects=False)
     assert check_all.status_code == 303
+    assert check_all.headers["location"] == "/videos?process=uncheck"
     assert app.state.db.count_videos("uncheck") == 0
     assert app.state.db.count_videos("checked") == 25
 
@@ -103,3 +104,60 @@ def test_settings_rate_limit_pause_uses_taipei_time(tmp_path):
     assert response.status_code == 200
     assert "台灣時間" in response.text
     assert "Pause until" in response.text
+
+
+def test_mark_checked_stays_on_review_page(tmp_path):
+    app = make_app(tmp_path)
+    client = TestClient(app)
+    url = "https://www.youtube.com/watch?v=stayreview"
+    app.state.db.save_youtube(
+        YoutubeMetadata(
+            url=url,
+            video_id="stayreview",
+            title="Stay Review",
+            channel_id=None,
+            channel_name=None,
+            start_at=utcnow(),
+            media_type=None,
+            status="public",
+            thumbnail_url=None,
+            metadata_json="{}",
+        ),
+        None,
+    )
+
+    response = client.post(
+        "/videos/process",
+        data={"process": "checked", "return_process": "uncheck", "urls": [url]},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/videos?process=uncheck"
+    assert app.state.db.count_videos("uncheck") == 0
+    assert app.state.db.count_videos("checked") == 1
+
+
+def test_video_counts_api(tmp_path):
+    app = make_app(tmp_path)
+    client = TestClient(app)
+    app.state.db.save_youtube(
+        YoutubeMetadata(
+            url="https://www.youtube.com/watch?v=countme",
+            video_id="countme",
+            title="Count Me",
+            channel_id=None,
+            channel_name=None,
+            start_at=utcnow(),
+            media_type=None,
+            status="public",
+            thumbnail_url=None,
+            metadata_json="{}",
+        ),
+        None,
+    )
+
+    response = client.get("/api/videos/counts")
+
+    assert response.status_code == 200
+    assert response.json() == {"uncheck": 1, "checked": 0}
