@@ -1,15 +1,25 @@
 {% extends "base.html" %}
-{% block title %}Antenna Videos{% endblock %}
+{% block title %}Music Discovery Library{% endblock %}
+{% block body_class %}library-page{% endblock %}
 {% block content %}
-<section class="page-head">
-  <div>
-    <h1>Videos</h1>
-    <p>{{ process }} queue</p>
+<section class="library-hero">
+  <div class="library-copy">
+    <span class="eyebrow">Antenna Music Radar</span>
+    <h1>Music Discovery Library</h1>
+    <p>自動收集歌手、VTuber、直播與音樂影片，像私人唱片店一樣慢慢整理你的待聽清單。</p>
   </div>
+  <div class="library-stats" aria-label="Current library queue">
+    <span>{{ total_count }}</span>
+    <strong>{{ "new finds" if process == "uncheck" else "archived picks" }}</strong>
+  </div>
+</section>
+
+<section class="library-toolbar">
   <div class="segmented">
-    <a class="{{ 'active' if process == 'uncheck' else '' }}" href="/videos?process=uncheck">Uncheck</a>
-    <a class="{{ 'active' if process == 'checked' else '' }}" href="/videos?process=checked">Checked</a>
+    <a class="{{ 'active' if process == 'uncheck' else '' }}" href="/videos?process=uncheck">New</a>
+    <a class="{{ 'active' if process == 'checked' else '' }}" href="/videos?process=checked">Archived</a>
   </div>
+  <p>{{ "Fresh discoveries waiting for a listen." if process == "uncheck" else "Saved signals already archived." }}</p>
 </section>
 
 <form action="/videos/process" method="post">
@@ -20,44 +30,47 @@
     <button class="button secondary" type="button" data-select-all>Select all</button>
     {% endif %}
     <button class="button" type="submit">
-      Mark {{ 'checked' if process == 'uncheck' else 'uncheck' }}
+      Mark {{ 'archived' if process == 'uncheck' else 'new' }}
     </button>
   </div>
 
   {% if videos %}
-  <section class="video-list">
+  <section class="video-grid" aria-label="Music videos">
     {% for video in videos %}
-    <article class="video-row">
-      <label class="check">
-        <input type="checkbox" name="urls" value="{{ video.url }}">
-      </label>
-      <a class="thumb" href="{{ video.url }}" target="_blank" rel="noreferrer">
+    <article class="video-card">
+      <div class="card-topline">
+        <label class="check" aria-label="Select {{ video.title or video.video_id }}">
+          <input type="checkbox" name="urls" value="{{ video.url }}">
+        </label>
+      </div>
+      <a class="thumb" href="{{ video.url }}" target="_blank" rel="noreferrer" aria-label="Open {{ video.title or video.video_id }}">
         {% if video.thumbnail_path %}
         <img src="/{{ video.thumbnail_path }}" alt="" loading="lazy" decoding="async">
         {% else %}
-        <span>No image</span>
+        <span class="no-thumb">No cover</span>
         {% endif %}
       </a>
       <div class="video-main">
         <h2><a href="{{ video.url }}" target="_blank" rel="noreferrer">{{ video.title or video.video_id }}</a></h2>
-        <p>{{ video.channel_name or video.channel_id or "Unknown channel" }}</p>
-        <dl>
-          <div><dt>Start</dt><dd>{{ video.start_at | local_time }}</dd></div>
-          <div><dt>Status</dt><dd>{{ video.status }}</dd></div>
-          <div><dt>Process</dt><dd>{{ video.process }}</dd></div>
-        </dl>
+        <p class="channel-name">{{ video.channel_name or video.channel_id or "Unknown channel" }}</p>
+        <div class="video-meta">
+          <span>{{ video.start_at | local_time if video.start_at else "No date yet" }}</span>
+        </div>
       </div>
     </article>
     {% endfor %}
   </section>
   {% else %}
-  <p class="empty">No videos in this queue.</p>
+  <section class="library-empty">
+    <h2>{{ "No new discoveries." if process == "uncheck" else "No archived picks yet." }}</h2>
+    <p>{{ "Run a scan and Antenna will restock this shelf." if process == "uncheck" else "Mark new finds as archived to build your archive." }}</p>
+  </section>
   {% endif %}
 </form>
 
 {% if process == 'uncheck' and total_count > 0 %}
 <form class="dangerbar" action="/videos/check-all" method="post">
-  <button class="button" type="submit">Check all {{ total_count }} videos</button>
+  <button class="button" type="submit">Archive all {{ total_count }} finds</button>
 </form>
 {% endif %}
 

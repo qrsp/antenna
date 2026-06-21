@@ -6,12 +6,11 @@
     <title>{% block title %}Antenna{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
   </head>
-  <body>
+  <body class="{% block body_class %}radar-page{% endblock %}">
     <header class="topbar">
       <a class="brand" href="/">Antenna</a>
       <nav class="nav">
-        <a href="/videos?process=uncheck">Review</a>
-        <a href="/videos?process=checked">Checked</a>
+        <a href="/videos?process=uncheck">Library</a>
         <a href="/accounts">Accounts</a>
         <a href="/settings">Settings</a>
       </nav>
@@ -26,6 +25,7 @@
           month: "2-digit",
           day: "2-digit",
           hour: "2-digit",
+          hour12: false,
           minute: "2-digit",
           second: "2-digit",
         });

@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Antenna Accounts{% endblock %}
 {% block content %}
-<section class="page-head">
+<section class="page-head app-hero">
   <div>
+    <span class="eyebrow">Signal Sources</span>
     <h1>Accounts</h1>
-    <p>Account scan state and per-account scanning.</p>
+    <p>Tracked artists, VTubers, and music channels feeding the discovery shelf.</p>
   </div>
 </section>
 
 <section class="table-wrap">
-  <h2>Scan State</h2>
+  <h2>Source Scan State</h2>
   {% if accounts %}
   <table>
     <thead>

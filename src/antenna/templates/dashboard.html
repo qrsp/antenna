@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Antenna Dashboard{% endblock %}
 {% block content %}
-<section class="page-head">
+<section class="page-head app-hero">
   <div>
+    <span class="eyebrow">Control Booth</span>
     <h1>Dashboard</h1>
-    <p>Scan status and review queue.</p>
+    <p>Scan status, queue signals, and the next sweep across your music radar.</p>
   </div>
   <div class="actions">
     <form action="/scans" method="post">
@@ -18,11 +19,11 @@
 
 <section class="metrics">
   <div class="metric">
-    <span class="metric-label">Uncheck</span>
+    <span class="metric-label">New Finds</span>
     <strong id="unchecked-count">{{ unchecked_count }}</strong>
   </div>
   <div class="metric">
-    <span class="metric-label">Checked</span>
+    <span class="metric-label">Archived</span>
     <strong id="checked-count">{{ checked_count }}</strong>
   </div>
   <div class="metric">
@@ -32,7 +33,7 @@
 </section>
 
 <section class="table-wrap" id="latest-scan-panel">
-  <h2>Latest Scan</h2>
+  <h2>Latest Scan Session</h2>
   {% if latest_scan %}
   <table>
     <tbody>
