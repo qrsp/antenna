@@ -39,3 +39,4 @@ packages = ["src/antenna"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "--basetemp=.pytest_tmp"

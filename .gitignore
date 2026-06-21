@@ -11,3 +11,4 @@ src/antenna/static/thumbnails/*
 !src/antenna/static/thumbnails/.gitkeep
 session.tw_session
 config.toml
+.pytest_tmp
