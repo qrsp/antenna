@@ -224,7 +224,7 @@ def test_accounts_page_sorts_by_selected_field(tmp_path):
     assert response.text.index("<td>older_user</td>") < response.text.index("<td>never_user</td>")
 
 
-def test_single_account_scan_form_preserves_account_sort(tmp_path):
+def test_single_account_scan_form_redirects_to_dashboard(tmp_path):
     app = make_app(tmp_path, follow=["target_user"])
     app.state.scanner = RecordingScanner()
     client = TestClient(app)
@@ -240,7 +240,7 @@ def test_single_account_scan_form_preserves_account_sort(tmp_path):
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/accounts?sort=last_tweet_at&direction=desc"
+    assert response.headers["location"] == "/"
     assert app.state.scanner.calls == [
         {"force": True, "limit_accounts": ["target_user"]},
     ]
@@ -258,7 +258,7 @@ def test_single_account_scan_form_forces_limited_scan(tmp_path):
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/accounts"
+    assert response.headers["location"] == "/"
     assert app.state.scanner.calls == [
         {"force": True, "limit_accounts": ["target_user"]},
     ]

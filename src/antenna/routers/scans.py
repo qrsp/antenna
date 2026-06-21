@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -177,15 +176,9 @@ def account_scan_states_page(request: Request, sort: str = "user_screen_name", d
 def scan_single_account_form(
     request: Request,
     username: str = Form(...),
-    return_sort: str | None = Form(None),
-    return_direction: str | None = Form(None),
 ):
     username = username.strip()
     if username not in request.app.state.settings.lists.follow:
         raise HTTPException(status_code=400, detail="account must be in the follow list")
     request.app.state.scanner.start(force=True, limit_accounts=[username])
-    redirect_url = "/accounts"
-    if return_sort is not None or return_direction is not None:
-        sort, direction = _normalized_sort(return_sort or "", return_direction or "")
-        redirect_url = f"{redirect_url}?{urlencode({'sort': sort, 'direction': direction})}"
-    return RedirectResponse(url=redirect_url, status_code=303)
+    return RedirectResponse(url="/", status_code=303)

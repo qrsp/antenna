@@ -84,8 +84,6 @@
           {% if account.can_scan %}
           <form action="/accounts/scan" method="post">
             <input type="hidden" name="username" value="{{ account.user_screen_name }}">
-            <input type="hidden" name="return_sort" value="{{ sort }}">
-            <input type="hidden" name="return_direction" value="{{ direction }}">
             <button class="button secondary compact" type="submit">Scan</button>
           </form>
           {% else %}
