@@ -326,19 +326,21 @@ class Database:
         last_tweet_at: datetime | None,
         last_status: str,
         last_error: str | None = None,
+        last_status_id: str | None = None,
     ) -> None:
         now = dt_to_db(utcnow())
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO account_scan_state (
-                    user_screen_name, last_scan_at, last_tweet_at,
+                    user_screen_name, last_scan_at, last_tweet_at, last_status_id,
                     last_status, last_error, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_screen_name) DO UPDATE SET
                     last_scan_at = excluded.last_scan_at,
                     last_tweet_at = excluded.last_tweet_at,
+                    last_status_id = COALESCE(excluded.last_status_id, account_scan_state.last_status_id),
                     last_status = excluded.last_status,
                     last_error = excluded.last_error,
                     updated_at = excluded.updated_at
@@ -347,6 +349,7 @@ class Database:
                     username,
                     dt_to_db(last_scan_at),
                     dt_to_db(last_tweet_at),
+                    last_status_id,
                     last_status,
                     last_error,
                     now,
@@ -357,67 +360,27 @@ class Database:
         with self.connect() as conn:
             row = conn.execute(
                 """
-                SELECT status_id FROM twitter
+                SELECT last_status_id
+                FROM account_scan_state
                 WHERE user_screen_name = ?
-                ORDER BY created_at DESC
-                LIMIT 1
                 """,
                 (username,),
             ).fetchone()
-        return None if row is None else row["status_id"]
+        return None if row is None else row["last_status_id"]
 
     def save_tweets(self, tweets: list[TweetRecord]) -> int:
-        now = dt_to_db(utcnow())
-        count = 0
-        with self.connect() as conn:
-            for tweet in tweets:
-                cursor = conn.execute(
-                    """
-                    INSERT OR IGNORE INTO twitter (
-                        status_id, user_screen_name, in_timeline, created_at
-                    )
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        tweet.status_id,
-                        tweet.user_screen_name,
-                        1 if tweet.in_timeline else 0,
-                        dt_to_db(tweet.created_at),
-                    ),
-                )
-                count += cursor.rowcount
-                for url in tweet.urls:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO urls (url, created_at) VALUES (?, ?)",
-                        (url, now),
-                    )
-                    conn.execute(
-                        """
-                        INSERT OR IGNORE INTO tweet_urls (status_id, url, relation, created_at)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (tweet.status_id, url, tweet.relation, now),
-                    )
-        return count
-
-    def save_url(self, url: str) -> None:
-        with self.connect() as conn:
-            conn.execute(
-                "INSERT OR IGNORE INTO urls (url, created_at) VALUES (?, ?)",
-                (url, dt_to_db(utcnow())),
-            )
+        return len(tweets)
 
     def save_youtube(self, item: YoutubeMetadata, thumbnail_path: str | None) -> None:
-        self.save_url(item.url)
         now = dt_to_db(utcnow())
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO youtube (
                     url, video_id, title, channel_id, channel_name, start_at, media_type,
-                    status, library_state, thumbnail_path, metadata_json, created_at, updated_at
+                    status, library_state, thumbnail_path, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     video_id = excluded.video_id,
                     title = excluded.title,
@@ -427,7 +390,6 @@ class Database:
                     media_type = excluded.media_type,
                     status = excluded.status,
                     thumbnail_path = COALESCE(excluded.thumbnail_path, youtube.thumbnail_path),
-                    metadata_json = excluded.metadata_json,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -441,7 +403,6 @@ class Database:
                     item.status,
                     LIBRARY_NEW,
                     thumbnail_path,
-                    item.metadata_json,
                     now,
                     now,
                 ),

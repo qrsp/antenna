@@ -89,7 +89,6 @@ def test_archived_page_paginates_and_archive_all_updates_new_queue(tmp_path):
                 media_type=None,
                 status="public",
                 thumbnail_url=None,
-                metadata_json="{}",
             ),
             None,
         )
@@ -122,7 +121,6 @@ def test_new_page_paginates_and_times_use_local_time(tmp_path):
                 media_type=None,
                 status="public",
                 thumbnail_url=None,
-                metadata_json="{}",
             ),
             None,
         )
@@ -148,7 +146,6 @@ def test_new_page_lazy_loads_thumbnails(tmp_path):
             media_type=None,
             status="public",
             thumbnail_url=None,
-            metadata_json="{}",
         ),
         "static/thumbnails/thumbed.jpg",
     )
@@ -228,7 +225,6 @@ def test_mark_archived_stays_on_new_page(tmp_path):
             media_type=None,
             status="public",
             thumbnail_url=None,
-            metadata_json="{}",
         ),
         None,
     )
@@ -259,7 +255,6 @@ def test_video_counts_api(tmp_path):
             media_type=None,
             status="public",
             thumbnail_url=None,
-            metadata_json="{}",
         ),
         None,
     )

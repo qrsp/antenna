@@ -30,4 +30,3 @@ class YoutubeMetadata:
     media_type: str | None
     status: str
     thumbnail_url: str | None
-    metadata_json: str

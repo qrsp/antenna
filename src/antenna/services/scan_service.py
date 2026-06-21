@@ -191,11 +191,13 @@ class ScanService:
 
         state = self.db.get_account_state(username) or {}
         last_tweet_at = self._latest_tweet_time(tweets) or db_to_dt(state.get("last_tweet_at"))
+        last_status_id = self._latest_status_id(tweets)
         now = utcnow()
         self.db.upsert_account_state(
             username,
             last_scan_at=now,
             last_tweet_at=last_tweet_at,
+            last_status_id=last_status_id,
             last_status="success",
         )
 
@@ -203,6 +205,13 @@ class ScanService:
         if not tweets:
             return None
         return max(tweet.created_at for tweet in tweets)
+
+    def _latest_status_id(self, tweets: list) -> str | None:
+        if not tweets:
+            return None
+        if all(tweet.status_id.isdigit() for tweet in tweets):
+            return max(tweets, key=lambda tweet: int(tweet.status_id)).status_id
+        return max(tweets, key=lambda tweet: tweet.status_id).status_id
 
     def _remaining_accounts(self, accounts: list[str], username: str) -> list[str]:
         try:

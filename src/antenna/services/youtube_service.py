@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
 
@@ -93,7 +92,6 @@ class YoutubeService:
             media_type=info.get("live_status") or info.get("media_type") or info.get("_type"),
             status=status,
             thumbnail_url=info.get("thumbnail"),
-            metadata_json=json.dumps(info, ensure_ascii=False, default=str),
         )
 
     def _parse_time(self, info: dict) -> datetime | None:
