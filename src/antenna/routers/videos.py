@@ -56,8 +56,9 @@ def videos_page(request: Request, process: str = Query("uncheck")):
         raise HTTPException(status_code=400, detail="process must be checked or uncheck")
     rows = request.app.state.review.list_videos(process)
     return request.app.state.templates.TemplateResponse(
+        request,
         "videos.html",
-        {"request": request, "videos": rows, "process": process},
+        {"videos": rows, "process": process},
     )
 
 

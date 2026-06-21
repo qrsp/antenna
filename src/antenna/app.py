@@ -52,9 +52,9 @@ def create_app() -> FastAPI:
         pause_until = scheduler.twitter_pause_until()
         latest_scan = db.get_latest_scan()
         return app.state.templates.TemplateResponse(
+            request,
             "dashboard.html",
             {
-                "request": request,
                 "unchecked_count": db.count_videos("uncheck"),
                 "checked_count": db.count_videos("checked"),
                 "latest_scan": latest_scan,

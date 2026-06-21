@@ -11,9 +11,9 @@ def settings_page(request: Request):
     settings = request.app.state.settings
     pause_until = request.app.state.scheduler.twitter_pause_until()
     return request.app.state.templates.TemplateResponse(
+        request,
         "settings.html",
         {
-            "request": request,
             "settings": settings,
             "pause_until": pause_until,
         },
