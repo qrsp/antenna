@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Antenna{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">Antenna</a>
+      <nav class="nav">
+        <a href="/videos?process=uncheck">Review</a>
+        <a href="/videos?process=checked">Checked</a>
+        <a href="/settings">Settings</a>
+      </nav>
+    </header>
+    <main class="page">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

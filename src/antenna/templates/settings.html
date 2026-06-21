@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Antenna Settings{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p>Current runtime configuration.</p>
+  </div>
+</section>
+
+<section class="table-wrap">
+  <h2>Twitter</h2>
+  <table>
+    <tbody>
+      <tr><th>Cookie env</th><td>{{ settings.twitter.cookies_env }}</td></tr>
+      <tr><th>Cookie configured</th><td>{{ "Yes" if settings.twitter.has_cookies else "No" }}</td></tr>
+      <tr><th>Pause until</th><td>{{ pause_until.isoformat() if pause_until else "None" }}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="table-wrap">
+  <h2>Lists</h2>
+  <table>
+    <tbody>
+      <tr><th>Follow</th><td>{{ settings.lists.follow | join(", ") if settings.lists.follow else "None" }}</td></tr>
+      <tr><th>Black URLs</th><td>{{ settings.lists.blackurls | join(", ") if settings.lists.blackurls else "None" }}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="table-wrap">
+  <h2>Scheduler</h2>
+  <table>
+    <tbody>
+      <tr><th>Minimum interval</th><td>{{ settings.scheduler.minimum_scan_interval_minutes }} minutes</td></tr>
+      <tr><th>Active interval</th><td>{{ settings.scheduler.active_account_interval_minutes }} minutes</td></tr>
+      <tr><th>Inactive interval</th><td>{{ settings.scheduler.inactive_account_interval_minutes }} minutes</td></tr>
+      <tr><th>Inactive after</th><td>{{ settings.scheduler.inactive_after_days }} days</td></tr>
+      <tr><th>Rate limit pause</th><td>{{ settings.scheduler.rate_limit_pause_minutes }} minutes</td></tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

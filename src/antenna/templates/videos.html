@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Antenna Videos{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Videos</h1>
+    <p>{{ process }} queue</p>
+  </div>
+  <div class="segmented">
+    <a class="{{ 'active' if process == 'uncheck' else '' }}" href="/videos?process=uncheck">Uncheck</a>
+    <a class="{{ 'active' if process == 'checked' else '' }}" href="/videos?process=checked">Checked</a>
+  </div>
+</section>
+
+<form action="/videos/process" method="post">
+  <input type="hidden" name="process" value="{{ 'checked' if process == 'uncheck' else 'uncheck' }}">
+  <div class="bulkbar">
+    <button class="button" type="submit">
+      Mark {{ 'checked' if process == 'uncheck' else 'uncheck' }}
+    </button>
+  </div>
+
+  {% if videos %}
+  <section class="video-list">
+    {% for video in videos %}
+    <article class="video-row">
+      <label class="check">
+        <input type="checkbox" name="urls" value="{{ video.url }}">
+      </label>
+      <a class="thumb" href="{{ video.url }}" target="_blank" rel="noreferrer">
+        {% if video.thumbnail_path %}
+        <img src="/{{ video.thumbnail_path }}" alt="">
+        {% else %}
+        <span>No image</span>
+        {% endif %}
+      </a>
+      <div class="video-main">
+        <h2><a href="{{ video.url }}" target="_blank" rel="noreferrer">{{ video.title or video.video_id }}</a></h2>
+        <p>{{ video.channel_name or video.channel_id or "Unknown channel" }}</p>
+        <dl>
+          <div><dt>Start</dt><dd>{{ video.start_at or "" }}</dd></div>
+          <div><dt>Status</dt><dd>{{ video.status }}</dd></div>
+          <div><dt>Process</dt><dd>{{ video.process }}</dd></div>
+        </dl>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% else %}
+  <p class="empty">No videos in this queue.</p>
+  {% endif %}
+</form>
+{% endblock %}

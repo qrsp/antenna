@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from antenna.config import Settings
+from antenna.db import Database, db_to_dt, utcnow
+from antenna.logging_util import get_logger
+from antenna.services.scheduler_service import SchedulerService
+from antenna.services.thumbnail_service import ThumbnailService
+from antenna.services.twitter_service import TwitterRateLimitError, TwitterService
+from antenna.services.youtube_service import YoutubeService
+
+
+NEW_ACCOUNT_MAX_TWEETS = 100
+
+
+class ScanService:
+    def __init__(
+        self,
+        settings: Settings,
+        db: Database,
+        scheduler: SchedulerService,
+        twitter: TwitterService,
+        youtube: YoutubeService,
+        thumbnails: ThumbnailService,
+    ):
+        self.settings = settings
+        self.db = db
+        self.scheduler = scheduler
+        self.twitter = twitter
+        self.youtube = youtube
+        self.thumbnails = thumbnails
+        self.logger = get_logger("antenna.scan")
+
+    def run(self, *, force: bool = False, limit_accounts: list[str] | None = None) -> dict[str, Any]:
+        scan_id = self.db.create_scan()
+        stats: dict[str, Any] = {
+            "accounts_considered": 0,
+            "accounts_scanned": 0,
+            "tweets_saved": 0,
+            "urls_seen": 0,
+            "youtube_saved": 0,
+            "errors": 0,
+            "deferred_accounts": 0,
+        }
+        try:
+            pause_until = self.scheduler.twitter_pause_until()
+            if pause_until and pause_until > utcnow():
+                message = f"Twitter scanning paused until {pause_until.isoformat()}"
+                self.db.finish_scan(scan_id, "paused", message, stats)
+                return {"id": scan_id, "status": "paused", "message": message, "stats": stats}
+
+            accounts, decisions = self.scheduler.due_accounts(
+                self.settings.lists.follow,
+                force=force,
+                limit_accounts=limit_accounts,
+            )
+            stats["accounts_considered"] = len(decisions)
+            stats["deferred_accounts"] = len([item for item in decisions if not item.should_scan])
+            for decision in decisions:
+                if not decision.should_scan:
+                    self.logger.info(
+                        "account %s deferred: %s until %s",
+                        decision.username,
+                        decision.reason,
+                        decision.next_scan_after,
+                    )
+
+            for username in accounts:
+                try:
+                    self._scan_account(username, stats)
+                    stats["accounts_scanned"] += 1
+                except TwitterRateLimitError as exc:
+                    pause_until = self.scheduler.pause_for_rate_limit()
+                    self.db.upsert_account_state(
+                        username,
+                        last_scan_at=utcnow(),
+                        last_tweet_at=None,
+                        next_scan_after=pause_until,
+                        last_status="rate_limited",
+                        last_error=str(exc),
+                    )
+                    message = f"Twitter rate limit reached; paused until {pause_until.isoformat()}"
+                    self.logger.warning(message)
+                    self.db.finish_scan(scan_id, "paused", message, stats)
+                    return {"id": scan_id, "status": "paused", "message": message, "stats": stats}
+                except Exception as exc:
+                    stats["errors"] += 1
+                    self.logger.exception("account %s failed", username)
+                    state = self.db.get_account_state(username) or {}
+                    last_tweet_at = db_to_dt(state.get("last_tweet_at"))
+                    self.db.upsert_account_state(
+                        username,
+                        last_scan_at=utcnow(),
+                        last_tweet_at=last_tweet_at,
+                        next_scan_after=self.scheduler.compute_next_scan_after(utcnow(), last_tweet_at),
+                        last_status="failed",
+                        last_error=str(exc),
+                    )
+
+            status = "failed" if stats["errors"] and not stats["accounts_scanned"] else "success"
+            message = None if status == "success" else "all account scans failed"
+            self.db.finish_scan(scan_id, status, message, stats)
+            return {"id": scan_id, "status": status, "message": message, "stats": stats}
+        except Exception as exc:
+            stats["errors"] += 1
+            self.logger.exception("scan %s failed", scan_id)
+            self.db.finish_scan(scan_id, "failed", str(exc), stats)
+            return {"id": scan_id, "status": "failed", "message": str(exc), "stats": stats}
+
+    def _scan_account(self, username: str, stats: dict[str, Any]) -> None:
+        since_status_id = self.db.get_latest_tweet_id(username)
+        max_tweets = None if since_status_id else NEW_ACCOUNT_MAX_TWEETS
+        tweets = self.twitter.fetch_tweets(
+            username,
+            since_status_id=since_status_id,
+            max_tweets=max_tweets,
+        )
+        if max_tweets is not None and len(tweets) >= max_tweets:
+            self.logger.info("new account %s scan stopped at %s tweets", username, max_tweets)
+        stats["tweets_saved"] += self.db.save_tweets(tweets)
+
+        urls = sorted({url for tweet in tweets for url in tweet.urls})
+        stats["urls_seen"] += len(urls)
+        youtube_urls = self.youtube.filter_urls(urls, self.settings.lists.blackurls)
+        for url in youtube_urls:
+            try:
+                metadata = self.youtube.fetch_metadata(url)
+                thumbnail_path = self.thumbnails.download(metadata.video_id, metadata.thumbnail_url)
+                self.db.save_youtube(metadata, thumbnail_path)
+                stats["youtube_saved"] += 1
+            except Exception:
+                stats["errors"] += 1
+                self.logger.exception("youtube metadata failed for %s", url)
+
+        state = self.db.get_account_state(username) or {}
+        last_tweet_at = self._latest_tweet_time(tweets) or db_to_dt(state.get("last_tweet_at"))
+        now = utcnow()
+        next_scan_after = self.scheduler.compute_next_scan_after(now, last_tweet_at)
+        self.db.upsert_account_state(
+            username,
+            last_scan_at=now,
+            last_tweet_at=last_tweet_at,
+            next_scan_after=next_scan_after,
+            last_status="success",
+        )
+
+    def _latest_tweet_time(self, tweets: list) -> datetime | None:
+        if not tweets:
+            return None
+        return max(tweet.created_at for tweet in tweets)

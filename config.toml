@@ -1,0 +1,19 @@
+[twitter]
+cookies_env = "ANTENNA_TWITTER_COOKIES"
+
+[lists]
+follow = []
+blackurls = []
+
+[scheduler]
+minimum_scan_interval_minutes = 60
+active_account_interval_minutes = 180
+inactive_account_interval_minutes = 1440
+inactive_after_days = 30
+rate_limit_pause_minutes = 900
+
+[app]
+database_url = "sqlite:///data/antenna.db"
+thumbnail_dir = "src/antenna/static/thumbnails"
+host = "127.0.0.1"
+port = 8000
