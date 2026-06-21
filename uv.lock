@@ -74,7 +74,7 @@ requires-dist = [
     { name = "python-dateutil", specifier = ">=2.8.2" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "requests", specifier = ">=2.32.0" },
-    { name = "tweety-ns", specifier = ">=2.4.1" },
+    { name = "tweety-ns", url = "https://github.com/mahrtayyab/tweety/archive/main.zip" },
     { name = "tzdata", specifier = ">=2025.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
     { name = "yt-dlp", extras = ["default"], specifier = ">=2026.2.4" },
@@ -929,7 +929,7 @@ wheels = [
 [[package]]
 name = "tweety-ns"
 version = "2.4.1"
-source = { registry = "https://pypi.org/simple" }
+source = { url = "https://github.com/mahrtayyab/tweety/archive/main.zip" }
 dependencies = [
     { name = "2captcha-python" },
     { name = "anticaptchaofficial" },
@@ -941,9 +941,19 @@ dependencies = [
     { name = "python-magic" },
     { name = "python-magic-bin", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/f7/53be95bce4443edc418c4e23753104080e9805cb5100437bfb240778ca48/tweety_ns-2.4.1.tar.gz", hash = "sha256:759cac45a62e28807ad0d65e0f84dd260b03ad7327a6aedb379d490108f8f943", size = 91135, upload-time = "2025-07-15T06:28:43.028Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/32/91881ab45057de826bdc596064d7c932dd9cfbf6ce056417af8a0c21318c/tweety_ns-2.4.1-py3-none-any.whl", hash = "sha256:be8008e34c07314d69c5365bd3f2a059044601c1c70b22902b6c110c1b59ad81", size = 102441, upload-time = "2025-07-15T06:28:41.522Z" },
+sdist = { hash = "sha256:9b9e8344e2b62510043d716044444122e50beb98097e0293237e3cf22b9713e2" }
+
+[package.metadata]
+requires-dist = [
+    { name = "2captcha-python" },
+    { name = "anticaptchaofficial" },
+    { name = "beautifulsoup4", extras = ["lxml"], specifier = "~=4.12" },
+    { name = "capsolver" },
+    { name = "dateutils" },
+    { name = "httpx", extras = ["http2"] },
+    { name = "openpyxl" },
+    { name = "python-magic" },
+    { name = "python-magic-bin", marker = "sys_platform == 'win32'" },
 ]
 
 [[package]]

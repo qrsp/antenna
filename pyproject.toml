@@ -14,7 +14,7 @@ dependencies = [
     "requests>=2.32.0",
     "tzdata>=2025.2",
     "yt-dlp[default]>=2026.2.4",
-    "tweety-ns>=2.4.1",
+    "tweety-ns @ https://github.com/mahrtayyab/tweety/archive/main.zip",
 ]
 
 [dependency-groups]
@@ -29,6 +29,9 @@ antenna = "antenna.__main__:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/antenna"]
