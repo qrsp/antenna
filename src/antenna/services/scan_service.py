@@ -100,7 +100,7 @@ class ScanService:
                         "account %s deferred: %s until %s",
                         decision.username,
                         decision.reason,
-                        decision.next_scan_after,
+                        decision.deferred_until,
                     )
 
             for username in accounts:
@@ -117,7 +117,6 @@ class ScanService:
                         username,
                         last_scan_at=db_to_dt(state.get("last_scan_at")),
                         last_tweet_at=db_to_dt(state.get("last_tweet_at")),
-                        next_scan_after=None,
                         last_status="rate_limited",
                         last_error=str(exc),
                     )
@@ -134,7 +133,6 @@ class ScanService:
                         username,
                         last_scan_at=utcnow(),
                         last_tweet_at=last_tweet_at,
-                        next_scan_after=None,
                         last_status="failed",
                         last_error=str(exc),
                     )
@@ -186,7 +184,6 @@ class ScanService:
             username,
             last_scan_at=now,
             last_tweet_at=last_tweet_at,
-            next_scan_after=None,
             last_status="success",
         )
 

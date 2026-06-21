@@ -65,7 +65,6 @@ CREATE TABLE IF NOT EXISTS account_scan_state (
     user_screen_name TEXT NOT NULL,
     last_scan_at TIMESTAMP,
     last_tweet_at TIMESTAMP,
-    next_scan_after TIMESTAMP,
     last_status TEXT,
     last_error TEXT,
     updated_at TIMESTAMP NOT NULL,
@@ -88,5 +87,3 @@ ON youtube (video_id);
 CREATE INDEX IF NOT EXISTS idx_twitter_user_created_at
 ON twitter (user_screen_name, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_account_scan_next_scan_after
-ON account_scan_state (next_scan_after);

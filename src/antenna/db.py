@@ -146,7 +146,6 @@ class Database:
         *,
         last_scan_at: datetime | None,
         last_tweet_at: datetime | None,
-        next_scan_after: datetime | None = None,
         last_status: str,
         last_error: str | None = None,
     ) -> None:
@@ -155,14 +154,13 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO account_scan_state (
-                    user_screen_name, last_scan_at, last_tweet_at, next_scan_after,
+                    user_screen_name, last_scan_at, last_tweet_at,
                     last_status, last_error, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_screen_name) DO UPDATE SET
                     last_scan_at = excluded.last_scan_at,
                     last_tweet_at = excluded.last_tweet_at,
-                    next_scan_after = excluded.next_scan_after,
                     last_status = excluded.last_status,
                     last_error = excluded.last_error,
                     updated_at = excluded.updated_at
@@ -171,7 +169,6 @@ class Database:
                     username,
                     dt_to_db(last_scan_at),
                     dt_to_db(last_tweet_at),
-                    dt_to_db(next_scan_after),
                     last_status,
                     last_error,
                     now,

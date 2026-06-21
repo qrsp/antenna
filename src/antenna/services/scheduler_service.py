@@ -15,7 +15,7 @@ class AccountDecision:
     username: str
     should_scan: bool
     reason: str
-    next_scan_after: datetime | None = None
+    deferred_until: datetime | None = None
 
 
 class SchedulerService:
@@ -44,20 +44,20 @@ class SchedulerService:
 
         last_scan_at = db_to_dt(state.get("last_scan_at"))
         last_tweet_at = db_to_dt(state.get("last_tweet_at"))
-        next_scan_after = self.compute_next_scan_after(last_scan_at or current, last_tweet_at)
+        deferred_until = self.compute_deferred_until(last_scan_at or current, last_tweet_at)
 
         if force:
-            return AccountDecision(username=username, should_scan=True, reason="forced", next_scan_after=next_scan_after)
+            return AccountDecision(username=username, should_scan=True, reason="forced", deferred_until=deferred_until)
 
         if last_scan_at:
             minimum_after = last_scan_at + timedelta(minutes=self.config.minimum_scan_interval_minutes)
             if minimum_after > current:
                 return AccountDecision(username, False, "minimum_interval", minimum_after)
 
-        if next_scan_after > current:
-            return AccountDecision(username, False, "activity_interval", next_scan_after)
+        if deferred_until > current:
+            return AccountDecision(username, False, "activity_interval", deferred_until)
 
-        return AccountDecision(username=username, should_scan=True, reason="due", next_scan_after=next_scan_after)
+        return AccountDecision(username=username, should_scan=True, reason="due", deferred_until=deferred_until)
 
     def due_accounts(
         self,
@@ -74,7 +74,7 @@ class SchedulerService:
         ]
         return [item.username for item in decisions if item.should_scan], decisions
 
-    def compute_next_scan_after(self, last_scan_at: datetime, last_tweet_at: datetime | None) -> datetime:
+    def compute_deferred_until(self, last_scan_at: datetime, last_tweet_at: datetime | None) -> datetime:
         if last_tweet_at is None:
             minutes = self.config.active_account_interval_minutes
         else:
