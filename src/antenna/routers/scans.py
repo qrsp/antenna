@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timezone
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -47,6 +48,73 @@ def _days_since(value: str | None) -> int | None:
     return max(0, (utcnow() - parsed).days)
 
 
+ACCOUNT_SORT_OPTIONS = {
+    "user_screen_name": "Account",
+    "last_scan_at": "Last scan",
+    "last_tweet_at": "Last tweet",
+    "last_tweet_age_days": "Tweet age",
+    "last_status": "Status",
+    "last_status_id": "Latest status ID",
+    "next_scan_at": "Next account scan",
+    "last_error": "Error",
+}
+ACCOUNT_SORT_DIRECTIONS = {"asc", "desc"}
+
+
+def _normalized_sort(sort: str, direction: str) -> tuple[str, str]:
+    if sort not in ACCOUNT_SORT_OPTIONS:
+        sort = "user_screen_name"
+    if direction not in ACCOUNT_SORT_DIRECTIONS:
+        direction = "asc"
+    return sort, direction
+
+
+def _sort_datetime(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = db_to_dt(value)
+    if value is not None and value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _account_sort_value(row: dict, sort: str):
+    if sort == "user_screen_name":
+        return row["user_screen_name"].casefold()
+    if sort in {"last_scan_at", "last_tweet_at"}:
+        return _sort_datetime(row.get(sort))
+    if sort == "last_tweet_age_days":
+        return row.get(sort)
+    if sort == "last_status":
+        return f"{row.get('last_status') or ''} {row.get('schedule_reason') or ''}".casefold()
+    if sort == "last_status_id":
+        status_id = row.get("last_status_id")
+        return status_id.casefold() if status_id else None
+    if sort == "next_scan_at":
+        if row.get("can_scan") and row.get("next_scan_at") is None:
+            return db_to_dt("0001-01-01T00:00:00+00:00")
+        return _sort_datetime(row.get("next_scan_at"))
+    if sort == "last_error":
+        return (row.get("last_error") or "").casefold()
+    return row["user_screen_name"].casefold()
+
+
+def _sort_accounts(rows: list[dict], sort: str, direction: str) -> list[dict]:
+    def has_value(row: dict) -> bool:
+        value = _account_sort_value(row, sort)
+        return value is not None and value != ""
+
+    populated = [row for row in rows if has_value(row)]
+    empty = [row for row in rows if not has_value(row)]
+    populated.sort(
+        key=lambda row: (_account_sort_value(row, sort), row["user_screen_name"].casefold()),
+        reverse=direction == "desc",
+    )
+    empty.sort(key=lambda row: row["user_screen_name"].casefold())
+    return populated + empty
+
+
 @page_router.post("/scans")
 def create_scan_form(request: Request):
     request.app.state.scanner.start(force=False, limit_accounts=None)
@@ -60,7 +128,8 @@ def create_force_scan_form(request: Request):
 
 
 @page_router.get("/accounts")
-def account_scan_states_page(request: Request):
+def account_scan_states_page(request: Request, sort: str = "user_screen_name", direction: str = "asc"):
+    sort, direction = _normalized_sort(sort, direction)
     settings = request.app.state.settings
     scheduler = request.app.state.scheduler
     states = request.app.state.db.list_account_states()
@@ -91,18 +160,33 @@ def account_scan_states_page(request: Request):
             state["can_scan"] = False
         state["last_tweet_age_days"] = _days_since(state.get("last_tweet_at"))
         rows.append(state)
+    rows = _sort_accounts(rows, sort, direction)
 
     return request.app.state.templates.TemplateResponse(
         request,
         "accounts.html",
-        {"accounts": rows},
+        {
+            "accounts": rows,
+            "sort": sort,
+            "direction": direction,
+            "sort_options": ACCOUNT_SORT_OPTIONS,
+        },
     )
 
 
 @page_router.post("/accounts/scan")
-def scan_single_account_form(request: Request, username: str = Form(...)):
+def scan_single_account_form(
+    request: Request,
+    username: str = Form(...),
+    return_sort: str | None = Form(None),
+    return_direction: str | None = Form(None),
+):
     username = username.strip()
     if username not in request.app.state.settings.lists.follow:
         raise HTTPException(status_code=400, detail="account must be in the follow list")
     request.app.state.scanner.start(force=True, limit_accounts=[username])
-    return RedirectResponse(url="/accounts", status_code=303)
+    redirect_url = "/accounts"
+    if return_sort is not None or return_direction is not None:
+        sort, direction = _normalized_sort(return_sort or "", return_direction or "")
+        redirect_url = f"{redirect_url}?{urlencode({'sort': sort, 'direction': direction})}"
+    return RedirectResponse(url=redirect_url, status_code=303)

@@ -196,6 +196,56 @@ def test_accounts_page_lists_scan_state_and_scan_button(tmp_path):
     assert "data-local-time" in response.text
 
 
+def test_accounts_page_sorts_by_selected_field(tmp_path):
+    app = make_app(tmp_path, follow=["older_user", "recent_user", "never_user"])
+    client = TestClient(app)
+    now = utcnow()
+    app.state.db.upsert_account_state(
+        "older_user",
+        last_scan_at=now - timedelta(hours=3),
+        last_tweet_at=now - timedelta(days=5),
+        last_status_id="100",
+        last_status="success",
+    )
+    app.state.db.upsert_account_state(
+        "recent_user",
+        last_scan_at=now - timedelta(hours=1),
+        last_tweet_at=now - timedelta(hours=2),
+        last_status_id="200",
+        last_status="success",
+    )
+
+    response = client.get("/accounts?sort=last_tweet_at&direction=desc")
+
+    assert response.status_code == 200
+    assert 'option value="last_tweet_at" selected' in response.text
+    assert 'option value="desc" selected' in response.text
+    assert response.text.index("<td>recent_user</td>") < response.text.index("<td>older_user</td>")
+    assert response.text.index("<td>older_user</td>") < response.text.index("<td>never_user</td>")
+
+
+def test_single_account_scan_form_preserves_account_sort(tmp_path):
+    app = make_app(tmp_path, follow=["target_user"])
+    app.state.scanner = RecordingScanner()
+    client = TestClient(app)
+
+    response = client.post(
+        "/accounts/scan",
+        data={
+            "username": "target_user",
+            "return_sort": "last_tweet_at",
+            "return_direction": "desc",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/accounts?sort=last_tweet_at&direction=desc"
+    assert app.state.scanner.calls == [
+        {"force": True, "limit_accounts": ["target_user"]},
+    ]
+
+
 def test_single_account_scan_form_forces_limited_scan(tmp_path):
     app = make_app(tmp_path, follow=["target_user"])
     app.state.scanner = RecordingScanner()

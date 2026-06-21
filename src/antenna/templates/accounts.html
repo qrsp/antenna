@@ -10,7 +10,27 @@
 </section>
 
 <section class="table-wrap">
-  <h2>Source Scan State</h2>
+  <div class="section-toolbar">
+    <h2>Source Scan State</h2>
+    <form class="sort-form" action="/accounts" method="get">
+      <label>
+        Sort by
+        <select name="sort">
+          {% for value, label in sort_options.items() %}
+          <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Direction
+        <select name="direction">
+          <option value="asc" {% if direction == "asc" %}selected{% endif %}>Ascending</option>
+          <option value="desc" {% if direction == "desc" %}selected{% endif %}>Descending</option>
+        </select>
+      </label>
+      <button class="button secondary compact" type="submit">Apply</button>
+    </form>
+  </div>
   {% if accounts %}
   <table>
     <thead>
@@ -41,6 +61,8 @@
           {% if account.can_scan %}
           <form action="/accounts/scan" method="post">
             <input type="hidden" name="username" value="{{ account.user_screen_name }}">
+            <input type="hidden" name="return_sort" value="{{ sort }}">
+            <input type="hidden" name="return_direction" value="{{ direction }}">
             <button class="button secondary compact" type="submit">Scan</button>
           </form>
           {% else %}

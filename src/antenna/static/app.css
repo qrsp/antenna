@@ -272,6 +272,40 @@ h2 {
   overflow-x: auto;
 }
 
+.section-toolbar,
+.sort-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-toolbar {
+  justify-content: space-between;
+}
+
+.sort-form {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sort-form label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.sort-form select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 28px 6px 9px;
+  background: #171a24;
+  color: var(--text);
+}
+
 .scan-progress {
   margin-top: 14px;
 }
@@ -610,9 +644,14 @@ dd {
   .topbar,
   .page-head,
   .library-hero,
-  .library-toolbar {
+  .library-toolbar,
+  .section-toolbar {
     align-items: start;
     flex-direction: column;
+  }
+
+  .sort-form {
+    justify-content: flex-start;
   }
 
   .library-hero {
