@@ -22,7 +22,7 @@
   </div>
   <div class="metric">
     <span class="metric-label">Rate Limit Pause</span>
-    <strong>{{ pause_until.isoformat() if pause_until else "None" }}</strong>
+    <strong>{{ (pause_until | taipei_time) ~ " 台灣時間" if pause_until else "None" }}</strong>
   </div>
 </section>
 
@@ -33,8 +33,8 @@
     <tbody>
       <tr><th>ID</th><td>{{ latest_scan.id }}</td></tr>
       <tr><th>Status</th><td>{{ latest_scan.status }}</td></tr>
-      <tr><th>Started</th><td>{{ latest_scan.started_at_taipei }} 台灣時間</td></tr>
-      <tr><th>Finished</th><td>{{ (latest_scan.finished_at_taipei ~ " 台灣時間") if latest_scan.finished_at_taipei else "" }}</td></tr>
+      <tr><th>Started</th><td>{{ (latest_scan.started_at | taipei_time) ~ " 台灣時間" if latest_scan.started_at else "" }}</td></tr>
+      <tr><th>Finished</th><td>{{ (latest_scan.finished_at | taipei_time) ~ " 台灣時間" if latest_scan.finished_at else "" }}</td></tr>
       <tr><th>Message</th><td>{{ latest_scan.message or "" }}</td></tr>
     </tbody>
   </table>

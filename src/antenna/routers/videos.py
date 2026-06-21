@@ -64,11 +64,11 @@ def videos_page(
 ):
     if process not in VALID_PROCESS:
         raise HTTPException(status_code=400, detail="process must be checked or uncheck")
-    per_page = 20 if process == "checked" else None
-    offset = (page - 1) * per_page if per_page else 0
+    per_page = 20
+    offset = (page - 1) * per_page
     rows = request.app.state.review.list_videos(process, limit=per_page, offset=offset)
     total_count = request.app.state.db.count_videos(process)
-    total_pages = max(1, (total_count + per_page - 1) // per_page) if per_page else 1
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
     return request.app.state.templates.TemplateResponse(
         request,
         "videos.html",

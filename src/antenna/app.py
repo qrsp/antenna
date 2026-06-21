@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from antenna import __version__
 from antenna.config import Settings, load_settings
 from antenna.db import Database
+from antenna.presentation import taipei_time
 from antenna.routers import health, scans, settings as settings_router, videos
 from antenna.services.review_service import ReviewService
 from antenna.services.scan_service import ScanService
@@ -18,18 +17,6 @@ from antenna.services.scheduler_service import SchedulerService
 from antenna.services.thumbnail_service import ThumbnailService
 from antenna.services.twitter_service import TwitterService
 from antenna.services.youtube_service import YoutubeService
-
-
-TAIPEI_TZ = ZoneInfo("Asia/Taipei")
-
-
-def _taipei_time(value: str | None) -> str:
-    if not value:
-        return ""
-    parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=ZoneInfo("UTC"))
-    return parsed.astimezone(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -52,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.scanner = scanner
     package_dir = Path(__file__).resolve().parent
     app.state.templates = Jinja2Templates(directory=str(package_dir / "templates"))
+    app.state.templates.env.filters["taipei_time"] = taipei_time
 
     app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
 
@@ -65,9 +53,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def dashboard(request: Request):
         pause_until = scheduler.twitter_pause_until()
         latest_scan = db.get_latest_scan()
-        if latest_scan:
-            latest_scan["started_at_taipei"] = _taipei_time(latest_scan.get("started_at"))
-            latest_scan["finished_at_taipei"] = _taipei_time(latest_scan.get("finished_at"))
         return app.state.templates.TemplateResponse(
             request,
             "dashboard.html",

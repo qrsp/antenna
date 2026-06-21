@@ -14,7 +14,7 @@
     <tbody>
       <tr><th>Cookie env</th><td>{{ settings.twitter.cookies_env }}</td></tr>
       <tr><th>Cookie configured</th><td>{{ "Yes" if settings.twitter.has_cookies else "No" }}</td></tr>
-      <tr><th>Pause until</th><td>{{ pause_until.isoformat() if pause_until else "None" }}</td></tr>
+      <tr><th>Pause until</th><td>{{ (pause_until | taipei_time) ~ " 台灣時間" if pause_until else "None" }}</td></tr>
     </tbody>
   </table>
 </section>
