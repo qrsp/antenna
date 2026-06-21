@@ -9,7 +9,7 @@ from antenna.logging_util import get_logger
 from antenna.services.scheduler_service import SchedulerService
 from antenna.services.thumbnail_service import ThumbnailService
 from antenna.services.twitter_service import TwitterRateLimitError, TwitterService
-from antenna.services.youtube_service import YoutubeService
+from antenna.services.youtube_service import YoutubeMetadataUnavailable, YoutubeService
 
 
 NEW_ACCOUNT_MAX_TWEETS = 100
@@ -130,6 +130,9 @@ class ScanService:
                 thumbnail_path = self.thumbnails.download(metadata.video_id, metadata.thumbnail_url)
                 self.db.save_youtube(metadata, thumbnail_path)
                 stats["youtube_saved"] += 1
+            except YoutubeMetadataUnavailable as exc:
+                stats["errors"] += 1
+                self.logger.warning("youtube metadata unavailable for %s: %s", url, exc.status)
             except Exception:
                 stats["errors"] += 1
                 self.logger.exception("youtube metadata failed for %s", url)

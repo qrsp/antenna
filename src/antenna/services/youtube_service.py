@@ -9,6 +9,24 @@ from dateutil import parser as date_parser
 from antenna.models import YoutubeMetadata
 
 
+class YoutubeMetadataUnavailable(RuntimeError):
+    def __init__(self, url: str, status: str, message: str):
+        self.url = url
+        self.status = status
+        super().__init__(message)
+
+
+class _QuietYtdlpLogger:
+    def debug(self, message: str) -> None:
+        pass
+
+    def warning(self, message: str) -> None:
+        pass
+
+    def error(self, message: str) -> None:
+        pass
+
+
 class YoutubeService:
     def canonicalize(self, url: str) -> tuple[str, str] | None:
         parsed = urlparse(url)
@@ -54,9 +72,14 @@ class YoutubeService:
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
+            "logger": _QuietYtdlpLogger(),
         }
-        with yt_dlp.YoutubeDL(options) as ydl:
-            info = ydl.extract_info(canonical_url, download=False)
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(canonical_url, download=False)
+        except Exception as exc:
+            status = self._status_from_error(str(exc))
+            raise YoutubeMetadataUnavailable(canonical_url, status, str(exc)) from exc
 
         status = str(info.get("availability") or "unknown")
         start_at = self._parse_time(info)
@@ -91,6 +114,18 @@ class YoutubeService:
                 except (ValueError, TypeError):
                     continue
         return None
+
+    def _status_from_error(self, message: str) -> str:
+        lowered = message.lower()
+        if "private video" in lowered:
+            return "private"
+        if "members-only" in lowered or "join this channel" in lowered:
+            return "members"
+        if "removed" in lowered:
+            return "removed"
+        if "unavailable" in lowered:
+            return "unavailable"
+        return "unknown"
 
     def _is_blacklisted(self, url: str, blackurls: list[str]) -> bool:
         host = urlparse(url).hostname or ""

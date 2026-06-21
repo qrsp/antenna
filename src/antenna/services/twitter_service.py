@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -7,6 +9,7 @@ from dateutil import parser as date_parser
 
 from antenna.config import TwitterConfig
 from antenna.models import TweetRecord
+from antenna.services.tweety_compat import patch_tweety_transaction_loader
 
 
 class TwitterRateLimitError(RuntimeError):
@@ -27,34 +30,77 @@ class TwitterService:
         if max_tweets is not None and max_tweets <= 0:
             return []
 
-        records: list[TweetRecord] = []
         try:
-            for raw in self._iter_raw_tweets(username):
-                record = self._to_record(username, raw)
-                if record is None:
-                    continue
-                if since_status_id and self._is_at_or_before_cutoff(record.status_id, since_status_id):
-                    break
-                records.append(record)
-                if max_tweets is not None and len(records) >= max_tweets:
-                    break
+            app = self._create_app()
+            records = self._run_async(
+                self._fetch_tweets_async(
+                    app,
+                    username,
+                    since_status_id=since_status_id,
+                    max_tweets=max_tweets,
+                )
+            )
         except Exception as exc:
             if "rate" in str(exc).lower() and "limit" in str(exc).lower():
                 raise TwitterRateLimitError(str(exc)) from exc
             raise
         return records
 
-    def _iter_raw_tweets(self, username: str):
+    def _run_async(self, coroutine):
+        if sys.platform == "win32":
+            loop = asyncio.SelectorEventLoop()
+            try:
+                return loop.run_until_complete(coroutine)
+            finally:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.close()
+        return asyncio.run(coroutine)
+
+    async def _fetch_tweets_async(
+        self,
+        app: Any,
+        username: str,
+        *,
+        since_status_id: str | None,
+        max_tweets: int | None,
+    ) -> list[TweetRecord]:
+        raw_pages = app.iter_tweets(username, pages=50, wait_time=0)
+        records: list[TweetRecord] = []
+        try:
+            async for item in raw_pages:
+                for raw in self._extract_page_items(item):
+                    record = self._to_record(username, raw)
+                    if record is None:
+                        continue
+                    if since_status_id and self._is_at_or_before_cutoff(record.status_id, since_status_id):
+                        return records
+                    records.append(record)
+                    if max_tweets is not None and len(records) >= max_tweets:
+                        return records
+        finally:
+            if hasattr(raw_pages, "aclose"):
+                await raw_pages.aclose()
+        return records
+
+    def _create_app(self):
         if not self.config.has_cookies:
             raise RuntimeError(f"{self.config.cookies_env} is not configured")
         try:
+            patch_tweety_transaction_loader()
             from tweety import Twitter
         except ImportError as exc:
             raise RuntimeError("tweety-ns is required to fetch Twitter timelines") from exc
 
         app = Twitter("session")
         app.load_cookies(self.config.cookies)
-        return app.iter_tweets(username, pages=50)
+        return app
+
+    def _extract_page_items(self, item: Any) -> list[Any]:
+        if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], list):
+            return item[1]
+        if isinstance(item, list):
+            return item
+        return [item]
 
     def _is_at_or_before_cutoff(self, status_id: str, cutoff: str) -> bool:
         if status_id.isdigit() and cutoff.isdigit():

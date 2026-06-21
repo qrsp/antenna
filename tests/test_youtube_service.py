@@ -1,4 +1,9 @@
-from antenna.services.youtube_service import YoutubeService
+import sys
+import types
+
+import pytest
+
+from antenna.services.youtube_service import YoutubeMetadataUnavailable, YoutubeService
 
 
 def test_canonicalize_supported_youtube_urls():
@@ -31,3 +36,25 @@ def test_filter_urls_applies_blacklist_and_deduplicates():
     )
 
     assert urls == ["https://www.youtube.com/watch?v=abc123"]
+
+
+def test_fetch_metadata_converts_expected_ytdlp_errors(monkeypatch):
+    class FakeYoutubeDL:
+        def __init__(self, options):
+            self.options = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def extract_info(self, url, download=False):
+            raise RuntimeError("Private video. Sign in if you've been granted access to this video.")
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", types.SimpleNamespace(YoutubeDL=FakeYoutubeDL))
+
+    with pytest.raises(YoutubeMetadataUnavailable) as exc:
+        YoutubeService().fetch_metadata("https://www.youtube.com/watch?v=abc123")
+
+    assert exc.value.status == "private"

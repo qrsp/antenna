@@ -8,14 +8,44 @@ class FakeTwitterService(TwitterService):
     def __init__(self, total):
         super().__init__(TwitterConfig())
         self.total = total
+        self.closed = False
 
-    def _iter_raw_tweets(self, username):
-        for index in range(self.total, 0, -1):
-            yield SimpleNamespace(
-                id=str(index),
-                created_at="2026-06-14T00:00:00+00:00",
-                urls=[],
-            )
+    def _create_app(self):
+        total = self.total
+        service = self
+
+        class FakeApp:
+            def iter_tweets(self, username, pages=50, wait_time=0):
+                page_size = 20
+
+                class FakeGenerator:
+                    def __init__(self):
+                        self.next_start = total
+
+                    def __aiter__(self):
+                        return self
+
+                    async def __anext__(self):
+                        if self.next_start <= 0:
+                            raise StopAsyncIteration
+                        start = self.next_start
+                        self.next_start -= page_size
+                        page = [
+                            SimpleNamespace(
+                                id=str(index),
+                                created_at="2026-06-14T00:00:00+00:00",
+                                urls=[],
+                            )
+                            for index in range(start, max(start - page_size, 0), -1)
+                        ]
+                        return object(), page
+
+                    async def aclose(self):
+                        service.closed = True
+
+                return FakeGenerator()
+
+        return FakeApp()
 
 
 def test_fetch_tweets_stops_at_max_tweets_for_new_account():
@@ -26,6 +56,7 @@ def test_fetch_tweets_stops_at_max_tweets_for_new_account():
     assert len(tweets) == 100
     assert tweets[0].status_id == "150"
     assert tweets[-1].status_id == "51"
+    assert service.closed is True
 
 
 def test_fetch_tweets_without_max_tweets_keeps_all_newer_than_cutoff():
