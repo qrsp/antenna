@@ -6,9 +6,14 @@
     <h1>Dashboard</h1>
     <p>Scan status and review queue.</p>
   </div>
-  <form action="/scans" method="post">
-    <button class="button" type="submit">Start Scan</button>
-  </form>
+  <div class="actions">
+    <form action="/scans" method="post">
+      <button class="button" type="submit">Start Scan</button>
+    </form>
+    <form action="/scans/force" method="post">
+      <button class="button secondary" type="submit">Force Scan</button>
+    </form>
+  </div>
 </section>
 
 <section class="metrics">

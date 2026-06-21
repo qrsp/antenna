@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from antenna.config import SchedulerConfig
@@ -15,8 +16,17 @@ class DummySettings:
 
 
 class FakeScanner:
+    def __init__(self):
+        self.starts = []
+        self.on_start = None
+
     def is_running(self):
         return False
+
+    def start(self, *, force=False, limit_accounts=None):
+        self.starts.append({"force": force, "limit_accounts": limit_accounts})
+        if self.on_start:
+            self.on_start()
 
 
 def test_auto_scan_waits_during_rate_limit_pause(tmp_path):
@@ -30,18 +40,26 @@ def test_auto_scan_waits_during_rate_limit_pause(tmp_path):
     db.set_runtime_value("twitter_pause_until", dt_to_db(pause_until))
 
     assert service._seconds_until_next_scan() > 0
-    assert service._should_force_after_pause() is False
 
 
-def test_auto_scan_forces_scan_after_rate_limit_pause_expires(tmp_path):
+def test_auto_scan_runs_without_force_after_rate_limit_pause_expires(tmp_path):
     db = Database(DummySettings(tmp_path / "test.db"))
     db.initialize()
     scheduler = SchedulerService(db, SchedulerConfig())
-    service = AutoScanService(FakeScanner(), scheduler)
+    scanner = FakeScanner()
+    service = AutoScanService(scanner, scheduler)
     scan_id = db.create_scan()
     pause_until = utcnow() - timedelta(seconds=1)
     db.finish_scan(scan_id, "paused", "paused", {})
     db.set_runtime_value("twitter_pause_until", dt_to_db(pause_until))
 
     assert service._seconds_until_next_scan() == 0
-    assert service._should_force_after_pause() is True
+
+    async def run_once():
+        service._stop = asyncio.Event()
+        scanner.on_start = service._stop.set
+        await service._run()
+
+    asyncio.run(run_once())
+
+    assert scanner.starts == [{"force": False, "limit_accounts": None}]

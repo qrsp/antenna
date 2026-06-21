@@ -39,3 +39,9 @@ page_router = APIRouter(tags=["scans"])
 def create_scan_form(request: Request):
     request.app.state.scanner.start(force=False, limit_accounts=None)
     return RedirectResponse(url="/", status_code=303)
+
+
+@page_router.post("/scans/force")
+def create_force_scan_form(request: Request):
+    request.app.state.scanner.start(force=True, limit_accounts=None)
+    return RedirectResponse(url="/", status_code=303)

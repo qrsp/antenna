@@ -19,6 +19,15 @@ def make_app(tmp_path):
     return create_app(settings)
 
 
+class RecordingScanner:
+    def __init__(self):
+        self.calls = []
+
+    def start(self, *, force=False, limit_accounts=None):
+        self.calls.append({"force": force, "limit_accounts": limit_accounts})
+        return {"id": 1, "status": "running", "stats": {}}
+
+
 def test_dashboard_latest_scan_uses_taipei_time(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)
@@ -29,6 +38,35 @@ def test_dashboard_latest_scan_uses_taipei_time(tmp_path):
 
     assert response.status_code == 200
     assert "台灣時間" in response.text
+
+
+def test_dashboard_has_force_scan_button(tmp_path):
+    app = make_app(tmp_path)
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'action="/scans/force"' in response.text
+    assert "Force Scan" in response.text
+
+
+def test_scan_forms_start_regular_and_force_scans(tmp_path):
+    app = make_app(tmp_path)
+    app.state.scanner = RecordingScanner()
+    client = TestClient(app)
+
+    regular = client.post("/scans", follow_redirects=False)
+    forced = client.post("/scans/force", follow_redirects=False)
+
+    assert regular.status_code == 303
+    assert regular.headers["location"] == "/"
+    assert forced.status_code == 303
+    assert forced.headers["location"] == "/"
+    assert app.state.scanner.calls == [
+        {"force": False, "limit_accounts": None},
+        {"force": True, "limit_accounts": None},
+    ]
 
 
 def test_checked_page_paginates_and_check_all_updates_review_queue(tmp_path):

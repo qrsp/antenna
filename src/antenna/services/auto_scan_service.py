@@ -35,9 +35,8 @@ class AutoScanService:
         while not self._stop.is_set():
             wait_seconds = self._seconds_until_next_scan()
             if wait_seconds <= 0:
-                force = self._should_force_after_pause()
-                self.logger.info("starting automatic scan force=%s", force)
-                self.scanner.start(force=force, limit_accounts=None)
+                self.logger.info("starting automatic scan force=False")
+                self.scanner.start(force=False, limit_accounts=None)
                 wait_seconds = 5
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=wait_seconds)
@@ -70,9 +69,3 @@ class AutoScanService:
             return utcnow()
         return started_at + interval
 
-    def _should_force_after_pause(self) -> bool:
-        latest = self.scheduler.db.get_latest_scan()
-        if latest is None or latest.get("status") != "paused":
-            return False
-        pause_until = self.scheduler.twitter_pause_until()
-        return pause_until is None or pause_until <= utcnow()
