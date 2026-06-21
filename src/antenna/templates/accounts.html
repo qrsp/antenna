@@ -56,7 +56,30 @@
         <td>{{ account.last_status }} <span class="muted">({{ account.schedule_reason }})</span></td>
         <td>{{ account.last_status_id or "" }}</td>
         <td>{{ account.next_scan_at | local_time if account.next_scan_at else "Due now" if account.can_scan else "" }}</td>
-        <td>{{ account.last_error or "" }}</td>
+        <td class="error-cell">
+          {% if account.last_error %}
+          {% set error_dialog_id = "account-error-" ~ loop.index %}
+          <button
+            class="button secondary compact error-open"
+            type="button"
+            data-error-dialog="{{ error_dialog_id }}"
+            aria-haspopup="dialog"
+          >
+            View error
+          </button>
+          <dialog class="error-dialog" id="{{ error_dialog_id }}" aria-labelledby="{{ error_dialog_id }}-title">
+            <div class="error-dialog-panel">
+              <div class="error-dialog-head">
+                <h3 id="{{ error_dialog_id }}-title">Error for {{ account.user_screen_name }}</h3>
+                <form method="dialog">
+                  <button class="dialog-close" type="submit" aria-label="Close error dialog">&times;</button>
+                </form>
+              </div>
+              <pre>{{ account.last_error }}</pre>
+            </div>
+          </dialog>
+          {% endif %}
+        </td>
         <td>
           {% if account.can_scan %}
           <form action="/accounts/scan" method="post">
@@ -77,4 +100,21 @@
   <p class="empty">No account scan state yet.</p>
   {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll("[data-error-dialog]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const dialog = document.getElementById(button.dataset.errorDialog);
+      if (dialog) dialog.showModal();
+    });
+  });
+
+  document.querySelectorAll(".error-dialog").forEach((dialog) => {
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  });
+</script>
 {% endblock %}

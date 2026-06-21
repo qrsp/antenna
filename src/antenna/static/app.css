@@ -354,6 +354,79 @@ td {
   color: #e5e8f1;
 }
 
+.error-cell {
+  width: 132px;
+  min-width: 132px;
+  max-width: 132px;
+}
+
+.error-dialog {
+  width: min(820px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+.error-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.66);
+  backdrop-filter: blur(3px);
+}
+
+.error-dialog-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: min(720px, calc(100vh - 32px));
+}
+
+.error-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.error-dialog h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dialog-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.dialog-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.error-dialog pre {
+  min-height: 0;
+  max-height: calc(100vh - 120px);
+  margin: 0;
+  padding: 18px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #d8dceb;
+  font: inherit;
+  line-height: 1.55;
+}
+
 .segmented {
   display: inline-flex;
   border: 1px solid var(--line);
