@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Music Discovery Library{% endblock %}
+{% block title %}Discovery Library{% endblock %}
 {% block body_class %}library-page{% endblock %}
 {% block content %}
 <section class="library-hero">
   <div class="library-copy">
-    <span class="eyebrow">Antenna Music Radar</span>
-    <h1>Music Discovery Library</h1>
-    <p>A private shelf for music, live sessions, and creator signals gathered from your tracked accounts.</p>
+    <span class="eyebrow">Video Signals</span>
+    <h1>Discovery Library</h1>
+    <p>Review new videos and media links collected from your tracked sources, then archive what you have handled.</p>
   </div>
   <div class="library-stats" aria-label="Current library queue">
     <span>{{ total_count }}</span>
@@ -19,7 +19,7 @@
     <a class="{{ 'active' if state == 'new' else '' }}" href="/videos?state=new">New</a>
     <a class="{{ 'active' if state == 'archived' else '' }}" href="/videos?state=archived">Archived</a>
   </div>
-  <p>{{ "Fresh discoveries waiting for a listen." if state == "new" else "Saved signals already archived." }}</p>
+  <p>{{ "Fresh discoveries waiting for review." if state == "new" else "Saved signals already archived." }}</p>
 </section>
 
 <form action="/videos/state" method="post">
@@ -35,7 +35,7 @@
   </div>
 
   {% if videos %}
-  <section class="video-grid" aria-label="Music videos">
+  <section class="video-grid" aria-label="Collected videos">
     {% for video in videos %}
     <article class="video-card">
       <div class="card-topline">
@@ -63,7 +63,7 @@
   {% else %}
   <section class="library-empty">
     <h2>{{ "No new discoveries." if state == "new" else "No archived picks yet." }}</h2>
-    <p>{{ "Run a scan and Antenna will restock this shelf." if state == "new" else "Mark new finds as archived to build your archive." }}</p>
+    <p>{{ "Run a scan and Antenna will restock this queue." if state == "new" else "Mark new finds as archived to build your archive." }}</p>
   </section>
   {% endif %}
 </form>
