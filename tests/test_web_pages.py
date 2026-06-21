@@ -134,6 +134,32 @@ def test_review_page_paginates_and_times_use_local_time(tmp_path):
     assert "data-local-time" in page.text
 
 
+def test_review_page_lazy_loads_thumbnails(tmp_path):
+    app = make_app(tmp_path)
+    client = TestClient(app)
+    app.state.db.save_youtube(
+        YoutubeMetadata(
+            url="https://www.youtube.com/watch?v=thumbed",
+            video_id="thumbed",
+            title="Thumbed",
+            channel_id=None,
+            channel_name=None,
+            start_at=utcnow(),
+            media_type=None,
+            status="public",
+            thumbnail_url=None,
+            metadata_json="{}",
+        ),
+        "static/thumbnails/thumbed.jpg",
+    )
+
+    page = client.get("/videos?process=uncheck")
+
+    assert page.status_code == 200
+    assert 'loading="lazy"' in page.text
+    assert 'decoding="async"' in page.text
+
+
 def test_settings_rate_limit_pause_uses_local_time(tmp_path):
     app = make_app(tmp_path)
     client = TestClient(app)

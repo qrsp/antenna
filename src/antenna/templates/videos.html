@@ -33,7 +33,7 @@
       </label>
       <a class="thumb" href="{{ video.url }}" target="_blank" rel="noreferrer">
         {% if video.thumbnail_path %}
-        <img src="/{{ video.thumbnail_path }}" alt="">
+        <img src="/{{ video.thumbnail_path }}" alt="" loading="lazy" decoding="async">
         {% else %}
         <span>No image</span>
         {% endif %}

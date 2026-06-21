@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS scan_resume_state (
 CREATE INDEX IF NOT EXISTS idx_youtube_process_start_at
 ON youtube (process, start_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_youtube_process_sort_at
+ON youtube (process, COALESCE(start_at, created_at) DESC);
+
 CREATE INDEX IF NOT EXISTS idx_youtube_video_id
 ON youtube (video_id);
 

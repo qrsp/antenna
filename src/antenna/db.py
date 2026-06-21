@@ -358,7 +358,20 @@ class Database:
         with self.connect() as conn:
             rows = conn.execute(
                 f"""
-                SELECT * FROM youtube
+                SELECT
+                    url,
+                    video_id,
+                    title,
+                    channel_id,
+                    channel_name,
+                    start_at,
+                    media_type,
+                    status,
+                    process,
+                    thumbnail_path,
+                    created_at,
+                    updated_at
+                FROM youtube
                 WHERE process = ?
                 ORDER BY COALESCE(start_at, created_at) DESC
                 {limit_clause}
