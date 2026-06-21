@@ -328,22 +328,20 @@ class Database:
         last_error: str | None = None,
         last_status_id: str | None = None,
     ) -> None:
-        now = dt_to_db(utcnow())
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO account_scan_state (
                     user_screen_name, last_scan_at, last_tweet_at, last_status_id,
-                    last_status, last_error, updated_at
+                    last_status, last_error
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_screen_name) DO UPDATE SET
                     last_scan_at = excluded.last_scan_at,
                     last_tweet_at = excluded.last_tweet_at,
                     last_status_id = COALESCE(excluded.last_status_id, account_scan_state.last_status_id),
                     last_status = excluded.last_status,
-                    last_error = excluded.last_error,
-                    updated_at = excluded.updated_at
+                    last_error = excluded.last_error
                 """,
                 (
                     username,
@@ -352,7 +350,6 @@ class Database:
                     last_status_id,
                     last_status,
                     last_error,
-                    now,
                 ),
             )
 

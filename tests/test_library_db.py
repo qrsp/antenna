@@ -115,6 +115,20 @@ def test_legacy_youtube_process_migrates_to_library_state(tmp_path):
     assert [row["video_id"] for row in db.list_videos("archived")] == ["oldarchived"]
 
 
+def test_account_scan_state_schema_drops_updated_at(tmp_path):
+    db = Database(DummySettings(tmp_path / "test.db"))
+    db.initialize()
+
+    with db.connect() as conn:
+        column_names = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(account_scan_state)").fetchall()
+        }
+
+    assert "updated_at" not in column_names
+    assert "last_status_id" in column_names
+
+
 def test_twitter_history_migrates_to_account_scan_cursor(tmp_path):
     db = Database(DummySettings(tmp_path / "test.db"))
     older = dt_to_db(utcnow())

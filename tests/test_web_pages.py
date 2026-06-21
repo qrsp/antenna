@@ -178,6 +178,7 @@ def test_accounts_page_lists_scan_state_and_scan_button(tmp_path):
         "example_user",
         last_scan_at=now - timedelta(hours=2),
         last_tweet_at=now - timedelta(days=2, hours=3),
+        last_status_id="12345",
         last_status="success",
     )
 
@@ -186,7 +187,10 @@ def test_accounts_page_lists_scan_state_and_scan_button(tmp_path):
     assert response.status_code == 200
     assert "example_user" in response.text
     assert "Tweet age" in response.text
+    assert "Latest status ID" in response.text
+    assert "12345" in response.text
     assert "Next account scan" in response.text
+    assert "Updated" not in response.text
     assert "<td>2</td>" in response.text
     assert 'action="/accounts/scan"' in response.text
     assert "data-local-time" in response.text

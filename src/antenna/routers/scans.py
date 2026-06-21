@@ -78,7 +78,7 @@ def account_scan_states_page(request: Request):
             "last_tweet_at": None,
             "last_status": "never_scanned",
             "last_error": None,
-            "updated_at": None,
+            "last_status_id": None,
         }
         if username in configured_accounts:
             decision = scheduler.decide_account(username)
