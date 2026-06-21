@@ -45,6 +45,7 @@ class SchedulerService:
         last_scan_at = db_to_dt(state.get("last_scan_at"))
         last_tweet_at = db_to_dt(state.get("last_tweet_at"))
         deferred_until = self.compute_deferred_until(last_scan_at or current, last_tweet_at, now=current)
+        account_interval_reason = self._account_interval_reason(last_tweet_at, current)
 
         if force:
             return AccountDecision(username=username, should_scan=True, reason="forced", deferred_until=deferred_until)
@@ -56,12 +57,20 @@ class SchedulerService:
                 return AccountDecision(username, False, "minimum_interval", minimum_after)
 
         if deferred_until > current:
-            return AccountDecision(username, False, "activity_interval", deferred_until)
+            return AccountDecision(username, False, account_interval_reason, deferred_until)
 
         if minimum_after and minimum_after > current:
             return AccountDecision(username, False, "minimum_interval", minimum_after)
 
         return AccountDecision(username=username, should_scan=True, reason="due", deferred_until=deferred_until)
+
+    def _account_interval_reason(self, last_tweet_at: datetime | None, current: datetime) -> str:
+        if last_tweet_at is None:
+            return "active_account_interval"
+        inactive_after = timedelta(days=self.config.inactive_after_days)
+        if current - last_tweet_at.astimezone(timezone.utc) >= inactive_after:
+            return "inactive_account_interval"
+        return "active_account_interval"
 
     def due_accounts(
         self,

@@ -37,11 +37,11 @@ def test_scheduler_defers_inactive_account_longer(tmp_path):
     decision = scheduler.decide_account("quiet_account", now=now)
 
     assert decision.should_scan is False
-    assert decision.reason == "activity_interval"
+    assert decision.reason == "inactive_account_interval"
     assert decision.deferred_until == now - timedelta(hours=3) + timedelta(minutes=1440)
 
 
-def test_scheduler_reports_later_activity_interval_when_minimum_interval_is_also_pending(tmp_path):
+def test_scheduler_reports_later_inactive_account_interval_when_minimum_interval_is_also_pending(tmp_path):
     db = Database(DummySettings(tmp_path / "test.db"))
     db.initialize()
     config = SchedulerConfig(
@@ -65,7 +65,7 @@ def test_scheduler_reports_later_activity_interval_when_minimum_interval_is_also
     decision = scheduler.decide_account("quiet_account", now=now)
 
     assert decision.should_scan is False
-    assert decision.reason == "activity_interval"
+    assert decision.reason == "inactive_account_interval"
     assert decision.deferred_until == last_scan_at + timedelta(minutes=7200)
 
 
