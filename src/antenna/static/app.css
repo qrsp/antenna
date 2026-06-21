@@ -136,6 +136,30 @@ h2 {
   overflow-x: auto;
 }
 
+.scan-progress {
+  margin-top: 14px;
+}
+
+.progress-track {
+  height: 8px;
+  background: #e9eef5;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 160ms ease;
+}
+
+.scan-progress p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

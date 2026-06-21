@@ -6,11 +6,13 @@ follow = []
 blackurls = []
 
 [scheduler]
+auto_scan_interval_minutes = 60
 minimum_scan_interval_minutes = 60
 active_account_interval_minutes = 180
 inactive_account_interval_minutes = 1440
 inactive_after_days = 30
 rate_limit_pause_minutes = 900
+new_account_max_tweets = 10
 
 [app]
 database_url = "sqlite:///data/antenna.db"

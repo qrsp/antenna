@@ -44,7 +44,7 @@ class SchedulerService:
 
         last_scan_at = db_to_dt(state.get("last_scan_at"))
         last_tweet_at = db_to_dt(state.get("last_tweet_at"))
-        next_scan_after = db_to_dt(state.get("next_scan_after"))
+        next_scan_after = self.compute_next_scan_after(last_scan_at or current, last_tweet_at)
 
         if force:
             return AccountDecision(username=username, should_scan=True, reason="forced", next_scan_after=next_scan_after)
@@ -54,14 +54,10 @@ class SchedulerService:
             if minimum_after > current:
                 return AccountDecision(username, False, "minimum_interval", minimum_after)
 
-        if next_scan_after and next_scan_after > current:
-            return AccountDecision(username, False, "next_scan_after", next_scan_after)
+        if next_scan_after > current:
+            return AccountDecision(username, False, "activity_interval", next_scan_after)
 
-        next_after = self.compute_next_scan_after(last_scan_at or current, last_tweet_at)
-        if next_after > current:
-            return AccountDecision(username, False, "activity_interval", next_after)
-
-        return AccountDecision(username=username, should_scan=True, reason="due", next_scan_after=next_after)
+        return AccountDecision(username=username, should_scan=True, reason="due", next_scan_after=next_scan_after)
 
     def due_accounts(
         self,

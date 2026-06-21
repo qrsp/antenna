@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -12,6 +14,7 @@ from antenna.db import Database
 from antenna.presentation import taipei_time
 from antenna.routers import health, scans, settings as settings_router, videos
 from antenna.services.review_service import ReviewService
+from antenna.services.auto_scan_service import AutoScanService
 from antenna.services.scan_service import ScanService
 from antenna.services.scheduler_service import SchedulerService
 from antenna.services.thumbnail_service import ThumbnailService
@@ -30,13 +33,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     twitter = TwitterService(settings.twitter)
     review = ReviewService(db)
     scanner = ScanService(settings, db, scheduler, twitter, youtube, thumbnails)
+    auto_scanner = AutoScanService(scanner, scheduler)
 
-    app = FastAPI(title="Antenna", version=__version__)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        auto_scanner.start()
+        try:
+            yield
+        finally:
+            await auto_scanner.stop()
+
+    app = FastAPI(title="Antenna", version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.db = db
     app.state.scheduler = scheduler
     app.state.review = review
     app.state.scanner = scanner
+    app.state.auto_scanner = auto_scanner
     package_dir = Path(__file__).resolve().parent
     app.state.templates = Jinja2Templates(directory=str(package_dir / "templates"))
     app.state.templates.env.filters["taipei_time"] = taipei_time

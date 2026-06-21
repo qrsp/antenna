@@ -26,20 +26,66 @@
   </div>
 </section>
 
-<section class="table-wrap">
+<section class="table-wrap" id="latest-scan-panel">
   <h2>Latest Scan</h2>
   {% if latest_scan %}
   <table>
     <tbody>
-      <tr><th>ID</th><td>{{ latest_scan.id }}</td></tr>
-      <tr><th>Status</th><td>{{ latest_scan.status }}</td></tr>
+      <tr><th>ID</th><td id="scan-id">{{ latest_scan.id }}</td></tr>
+      <tr><th>Status</th><td id="scan-status">{{ latest_scan.status }}</td></tr>
       <tr><th>Started</th><td>{{ (latest_scan.started_at | taipei_time) ~ " 台灣時間" if latest_scan.started_at else "" }}</td></tr>
       <tr><th>Finished</th><td>{{ (latest_scan.finished_at | taipei_time) ~ " 台灣時間" if latest_scan.finished_at else "" }}</td></tr>
-      <tr><th>Message</th><td>{{ latest_scan.message or "" }}</td></tr>
+      <tr><th>Message</th><td id="scan-message">{{ latest_scan.message or "" }}</td></tr>
     </tbody>
   </table>
+  <div class="scan-progress" aria-live="polite">
+    <div class="progress-track">
+      <span id="scan-progress-bar" style="width: 0%"></span>
+    </div>
+    <p id="scan-progress-text">Waiting for progress.</p>
+  </div>
   {% else %}
   <p class="empty">No scans yet.</p>
-  {% endif %}
+{% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const statusEl = document.querySelector("#scan-status");
+  const messageEl = document.querySelector("#scan-message");
+  const progressBar = document.querySelector("#scan-progress-bar");
+  const progressText = document.querySelector("#scan-progress-text");
+
+  function renderScan(scan) {
+    if (!statusEl || !scan) return;
+    const stats = scan.stats || {};
+    statusEl.textContent = scan.status || "";
+    messageEl.textContent = scan.message || "";
+
+    const total = Number(stats.accounts_total || 0);
+    const scanned = Number(stats.accounts_scanned || 0);
+    const current = stats.current_account;
+    const pct = total > 0 ? Math.min(100, Math.round((scanned / total) * 100)) : 0;
+    progressBar.style.width = `${pct}%`;
+    progressText.textContent = scan.status === "running"
+      ? `${scanned}/${total} accounts scanned${current ? `, now scanning ${current}` : ""}`
+      : `${scanned}/${total} accounts scanned`;
+  }
+
+  async function refreshLatestScan() {
+    if (!statusEl) return;
+    try {
+      const response = await fetch("/api/scans/latest", { headers: { "Accept": "application/json" } });
+      if (response.ok) {
+        renderScan(await response.json());
+      }
+    } catch (error) {
+      console.debug("scan refresh failed", error);
+    }
+  }
+
+  setInterval(refreshLatestScan, 3000);
+  refreshLatestScan();
+</script>
 {% endblock %}

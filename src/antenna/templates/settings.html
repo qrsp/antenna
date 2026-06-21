@@ -34,10 +34,12 @@
   <table>
     <tbody>
       <tr><th>Minimum interval</th><td>{{ settings.scheduler.minimum_scan_interval_minutes }} minutes</td></tr>
+      <tr><th>Automatic scan interval</th><td>{{ settings.scheduler.auto_scan_interval_minutes }} minutes</td></tr>
       <tr><th>Active interval</th><td>{{ settings.scheduler.active_account_interval_minutes }} minutes</td></tr>
       <tr><th>Inactive interval</th><td>{{ settings.scheduler.inactive_account_interval_minutes }} minutes</td></tr>
       <tr><th>Inactive after</th><td>{{ settings.scheduler.inactive_after_days }} days</td></tr>
       <tr><th>Rate limit pause</th><td>{{ settings.scheduler.rate_limit_pause_minutes }} minutes</td></tr>
+      <tr><th>New account max tweets</th><td>{{ settings.scheduler.new_account_max_tweets }}</td></tr>
     </tbody>
   </table>
 </section>

@@ -67,6 +67,17 @@ class Database:
             )
             return int(cursor.lastrowid)
 
+    def update_scan(self, scan_id: int, *, message: str | None, stats: dict[str, Any]) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE scans
+                SET message = ?, stats_json = ?
+                WHERE id = ? AND status = 'running'
+                """,
+                (message, json.dumps(stats, ensure_ascii=False), scan_id),
+            )
+
     def finish_scan(self, scan_id: int, status: str, message: str | None, stats: dict[str, Any]) -> None:
         with self.connect() as conn:
             conn.execute(
@@ -86,6 +97,13 @@ class Database:
     def get_latest_scan(self) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM scans ORDER BY id DESC LIMIT 1").fetchone()
+        return self._scan_row(row)
+
+    def get_running_scan(self) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM scans WHERE status = 'running' ORDER BY id DESC LIMIT 1",
+            ).fetchone()
         return self._scan_row(row)
 
     def _scan_row(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -128,7 +146,7 @@ class Database:
         *,
         last_scan_at: datetime | None,
         last_tweet_at: datetime | None,
-        next_scan_after: datetime | None,
+        next_scan_after: datetime | None = None,
         last_status: str,
         last_error: str | None = None,
     ) -> None:

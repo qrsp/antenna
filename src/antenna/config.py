@@ -30,18 +30,22 @@ class ListsConfig:
 
 @dataclass(frozen=True)
 class SchedulerConfig:
+    auto_scan_interval_minutes: int = 60
     minimum_scan_interval_minutes: int = 60
     active_account_interval_minutes: int = 180
     inactive_account_interval_minutes: int = 1440
     inactive_after_days: int = 30
     rate_limit_pause_minutes: int = 900
+    new_account_max_tweets: int = 10
 
     def validate(self) -> None:
         intervals = [
+            self.auto_scan_interval_minutes,
             self.minimum_scan_interval_minutes,
             self.active_account_interval_minutes,
             self.inactive_account_interval_minutes,
             self.rate_limit_pause_minutes,
+            self.new_account_max_tweets,
         ]
         if any(value <= 0 for value in intervals):
             raise ValueError("scheduler intervals must be positive")

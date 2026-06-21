@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from typing import Any
 
@@ -10,9 +11,6 @@ from antenna.services.scheduler_service import SchedulerService
 from antenna.services.thumbnail_service import ThumbnailService
 from antenna.services.twitter_service import TwitterRateLimitError, TwitterService
 from antenna.services.youtube_service import YoutubeMetadataUnavailable, YoutubeService
-
-
-NEW_ACCOUNT_MAX_TWEETS = 100
 
 
 class ScanService:
@@ -32,9 +30,43 @@ class ScanService:
         self.youtube = youtube
         self.thumbnails = thumbnails
         self.logger = get_logger("antenna.scan")
+        self._lock = threading.Lock()
+
+    def start(self, *, force: bool = False, limit_accounts: list[str] | None = None) -> dict[str, Any]:
+        if not self._lock.acquire(blocking=False):
+            running = self.db.get_running_scan()
+            if running is not None:
+                return running
+            return {"id": 0, "status": "running", "message": "scan already running", "stats": {}}
+
+        scan_id = self.db.create_scan()
+        thread = threading.Thread(
+            target=self._run_with_acquired_lock,
+            kwargs={"scan_id": scan_id, "force": force, "limit_accounts": limit_accounts},
+            daemon=True,
+        )
+        thread.start()
+        return self.db.get_scan(scan_id) or {"id": scan_id, "status": "running", "stats": {}}
 
     def run(self, *, force: bool = False, limit_accounts: list[str] | None = None) -> dict[str, Any]:
+        if not self._lock.acquire(blocking=False):
+            running = self.db.get_running_scan()
+            if running is not None:
+                return running
+            return {"id": 0, "status": "running", "message": "scan already running", "stats": {}}
         scan_id = self.db.create_scan()
+        return self._run_with_acquired_lock(scan_id=scan_id, force=force, limit_accounts=limit_accounts)
+
+    def is_running(self) -> bool:
+        return self._lock.locked()
+
+    def _run_with_acquired_lock(self, *, scan_id: int, force: bool, limit_accounts: list[str] | None) -> dict[str, Any]:
+        try:
+            return self._run_existing(scan_id=scan_id, force=force, limit_accounts=limit_accounts)
+        finally:
+            self._lock.release()
+
+    def _run_existing(self, *, scan_id: int, force: bool, limit_accounts: list[str] | None) -> dict[str, Any]:
         stats: dict[str, Any] = {
             "accounts_considered": 0,
             "accounts_scanned": 0,
@@ -43,6 +75,8 @@ class ScanService:
             "youtube_saved": 0,
             "errors": 0,
             "deferred_accounts": 0,
+            "current_account": None,
+            "accounts_total": 0,
         }
         try:
             pause_until = self.scheduler.twitter_pause_until()
@@ -58,6 +92,8 @@ class ScanService:
             )
             stats["accounts_considered"] = len(decisions)
             stats["deferred_accounts"] = len([item for item in decisions if not item.should_scan])
+            stats["accounts_total"] = len(accounts)
+            self.db.update_scan(scan_id, message="Scan queued accounts", stats=stats)
             for decision in decisions:
                 if not decision.should_scan:
                     self.logger.info(
@@ -68,16 +104,19 @@ class ScanService:
                     )
 
             for username in accounts:
+                stats["current_account"] = username
+                self.db.update_scan(scan_id, message=f"Scanning {username}", stats=stats)
                 try:
                     self._scan_account(username, stats)
                     stats["accounts_scanned"] += 1
+                    self.db.update_scan(scan_id, message=f"Finished {username}", stats=stats)
                 except TwitterRateLimitError as exc:
                     pause_until = self.scheduler.pause_for_rate_limit()
                     self.db.upsert_account_state(
                         username,
                         last_scan_at=utcnow(),
                         last_tweet_at=None,
-                        next_scan_after=pause_until,
+                        next_scan_after=None,
                         last_status="rate_limited",
                         last_error=str(exc),
                     )
@@ -94,11 +133,13 @@ class ScanService:
                         username,
                         last_scan_at=utcnow(),
                         last_tweet_at=last_tweet_at,
-                        next_scan_after=self.scheduler.compute_next_scan_after(utcnow(), last_tweet_at),
+                        next_scan_after=None,
                         last_status="failed",
                         last_error=str(exc),
                     )
+                    self.db.update_scan(scan_id, message=f"Failed {username}", stats=stats)
 
+            stats["current_account"] = None
             status = "failed" if stats["errors"] and not stats["accounts_scanned"] else "success"
             message = None if status == "success" else "all account scans failed"
             self.db.finish_scan(scan_id, status, message, stats)
@@ -111,7 +152,7 @@ class ScanService:
 
     def _scan_account(self, username: str, stats: dict[str, Any]) -> None:
         since_status_id = self.db.get_latest_tweet_id(username)
-        max_tweets = None if since_status_id else NEW_ACCOUNT_MAX_TWEETS
+        max_tweets = None if since_status_id else self.settings.scheduler.new_account_max_tweets
         tweets = self.twitter.fetch_tweets(
             username,
             since_status_id=since_status_id,
@@ -140,12 +181,11 @@ class ScanService:
         state = self.db.get_account_state(username) or {}
         last_tweet_at = self._latest_tweet_time(tweets) or db_to_dt(state.get("last_tweet_at"))
         now = utcnow()
-        next_scan_after = self.scheduler.compute_next_scan_after(now, last_tweet_at)
         self.db.upsert_account_state(
             username,
             last_scan_at=now,
             last_tweet_at=last_tweet_at,
-            next_scan_after=next_scan_after,
+            next_scan_after=None,
             last_status="success",
         )
 

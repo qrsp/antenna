@@ -31,14 +31,14 @@ def test_scheduler_defers_inactive_account_longer(tmp_path):
         "quiet_account",
         last_scan_at=now - timedelta(hours=3),
         last_tweet_at=old_tweet_at,
-        next_scan_after=scheduler.compute_next_scan_after(now - timedelta(hours=3), old_tweet_at),
+        next_scan_after=now - timedelta(days=1),
         last_status="success",
     )
 
     decision = scheduler.decide_account("quiet_account", now=now)
 
     assert decision.should_scan is False
-    assert decision.reason == "next_scan_after"
+    assert decision.reason == "activity_interval"
 
 
 def test_scheduler_rate_limit_pause(tmp_path):
