@@ -10,7 +10,7 @@ from antenna.db import Database, db_to_dt, utcnow
 from antenna.logging_util import get_logger
 from antenna.services.scheduler_service import SchedulerService
 from antenna.services.thumbnail_service import ThumbnailService
-from antenna.services.twitter_service import TwitterRateLimitError, TwitterService
+from antenna.services.twitter_service import TwitterClientUnavailableError, TwitterRateLimitError, TwitterService
 from antenna.services.youtube_service import YoutubeMetadataUnavailable, YoutubeService
 
 
@@ -122,6 +122,12 @@ class ScanService:
                         decision.deferred_until,
                     )
 
+            if accounts:
+                try:
+                    self.twitter.validate_client()
+                except TwitterClientUnavailableError as exc:
+                    return self._fail_fast_client_unavailable(scan_id, stats, exc)
+
             for username in accounts:
                 if self._cancel_event.is_set():
                     stats["current_account"] = None
@@ -161,6 +167,8 @@ class ScanService:
                     self.logger.warning(message)
                     self.db.finish_scan(scan_id, "paused", message, stats)
                     return {"id": scan_id, "status": "paused", "message": message, "stats": stats}
+                except TwitterClientUnavailableError as exc:
+                    return self._fail_fast_client_unavailable(scan_id, stats, exc)
                 except Exception as exc:
                     stats["errors"] += 1
                     self.logger.exception("account %s failed", username)
@@ -185,6 +193,19 @@ class ScanService:
             self.logger.exception("scan %s failed", scan_id)
             self.db.finish_scan(scan_id, "failed", str(exc), stats)
             return {"id": scan_id, "status": "failed", "message": str(exc), "stats": stats}
+
+    def _fail_fast_client_unavailable(
+        self,
+        scan_id: int,
+        stats: dict[str, Any],
+        exc: TwitterClientUnavailableError,
+    ) -> dict[str, Any]:
+        stats["errors"] += 1
+        stats["current_account"] = None
+        message = f"Twitter client unavailable: {exc}"
+        self.logger.error(message)
+        self.db.finish_scan(scan_id, "failed", message, stats)
+        return {"id": scan_id, "status": "failed", "message": message, "stats": stats}
 
     def _scan_account(self, username: str, stats: dict[str, Any]) -> None:
         since_status_id = self.db.get_latest_tweet_id(username)

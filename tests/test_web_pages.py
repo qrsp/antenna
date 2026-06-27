@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from antenna.app import create_app
 from antenna.config import AppConfig, ListsConfig, Settings
-from antenna.db import dt_to_db, utcnow
+from antenna.db import Database, dt_to_db, utcnow
 from antenna.models import YoutubeMetadata
 from antenna.services.scan_service import ScanAlreadyRunningError
 
@@ -59,6 +59,24 @@ def test_dashboard_latest_scan_uses_local_time(tmp_path):
     assert "Rate Limit Pause" not in response.text
     assert "data-local-time" in response.text
     assert "timeZoneName" not in response.text
+
+
+def test_app_startup_cleans_stale_running_scans(tmp_path):
+    settings = Settings(
+        app=AppConfig(
+            database_url=f"sqlite:///{tmp_path / 'test.db'}",
+            thumbnail_dir=str(tmp_path / "thumbnails"),
+        ),
+    )
+    db = Database(settings)
+    db.initialize()
+    scan_id = db.create_scan()
+
+    app = create_app(settings)
+
+    scan = app.state.db.get_scan(scan_id)
+    assert scan["status"] == "failed"
+    assert scan["message"] == "Scan interrupted by application restart"
 
 
 def test_dashboard_has_force_scan_button(tmp_path):

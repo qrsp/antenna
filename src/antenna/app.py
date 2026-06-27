@@ -28,6 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     db = Database(settings)
     db.initialize()
+    db.cleanup_stale_running_scans()
 
     scheduler = SchedulerService(db, settings.scheduler)
     youtube = YoutubeService()

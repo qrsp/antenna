@@ -16,6 +16,10 @@ class TwitterRateLimitError(RuntimeError):
     pass
 
 
+class TwitterClientUnavailableError(RuntimeError):
+    pass
+
+
 class TwitterService:
     _tweety_patch_applied = False
 
@@ -32,8 +36,8 @@ class TwitterService:
         if max_tweets is not None and max_tweets <= 0:
             return []
 
+        app = self._create_available_app()
         try:
-            app = self._create_app()
             records = self._run_async(
                 self._fetch_tweets_async(
                     app,
@@ -47,6 +51,17 @@ class TwitterService:
                 raise TwitterRateLimitError(str(exc)) from exc
             raise
         return records
+
+    def validate_client(self) -> None:
+        self._create_available_app()
+
+    def _create_available_app(self):
+        try:
+            return self._create_app()
+        except Exception as exc:
+            if "rate" in str(exc).lower() and "limit" in str(exc).lower():
+                raise TwitterRateLimitError(str(exc)) from exc
+            raise TwitterClientUnavailableError(str(exc)) from exc
 
     def _run_async(self, coroutine):
         if sys.platform == "win32":

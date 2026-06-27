@@ -58,3 +58,20 @@ def test_fresh_schema_has_only_current_tables_and_columns(tmp_path):
     assert "metadata_json" not in youtube_columns
     assert "updated_at" not in account_columns
     assert "last_status_id" in account_columns
+
+
+def test_cleanup_stale_running_scans_marks_interrupted_scans_failed(tmp_path):
+    db = Database(DummySettings(tmp_path / "test.db"))
+    db.initialize()
+    scan_id = db.create_scan()
+    db.update_scan(scan_id, message="Scanning example", stats={"current_account": "example", "errors": 2})
+
+    cleaned = db.cleanup_stale_running_scans()
+    scan = db.get_scan(scan_id)
+
+    assert cleaned == [scan_id]
+    assert scan["status"] == "failed"
+    assert scan["finished_at"] is not None
+    assert scan["message"] == "Scan interrupted by application restart"
+    assert scan["stats"]["current_account"] is None
+    assert scan["stats"]["errors"] == 2

@@ -9,7 +9,7 @@ from antenna.services import auto_scan_service
 from antenna.services.auto_scan_service import AutoScanService
 from antenna.services.scan_service import ScanService
 from antenna.services.scheduler_service import SchedulerService
-from antenna.services.twitter_service import TwitterRateLimitError
+from antenna.services.twitter_service import TwitterClientUnavailableError, TwitterRateLimitError
 
 
 class DummySettings:
@@ -48,6 +48,9 @@ class EmptyTwitter:
         )
         return []
 
+    def validate_client(self):
+        return None
+
 
 class RateLimitOnTwitter:
     def __init__(self, rate_limited_username):
@@ -58,6 +61,23 @@ class RateLimitOnTwitter:
         self.calls.append(username)
         if username == self.rate_limited_username:
             raise TwitterRateLimitError("rate limited")
+        return []
+
+    def validate_client(self):
+        return None
+
+
+class BrokenClientTwitter:
+    def __init__(self):
+        self.validated = False
+        self.calls = []
+
+    def validate_client(self):
+        self.validated = True
+        raise TwitterClientUnavailableError("Couldn't get animation key indices")
+
+    def fetch_tweets(self, username, *, since_status_id=None, max_tweets=None):
+        self.calls.append(username)
         return []
 
 
@@ -72,6 +92,9 @@ class BlockingTwitter:
         self.started.set()
         assert self.release.wait(timeout=1)
         return []
+
+    def validate_client(self):
+        return None
 
 
 class NullYoutube:
@@ -221,6 +244,26 @@ def test_scan_rate_limit_persists_resume_state_and_notifies_schedule_changed(tmp
     assert resume["limit_accounts"] == ["limited_account", "after_account"]
     assert twitter.calls == ["first_account", "limited_account"]
     assert scheduler.twitter_pause_until() is not None
+
+
+def test_scan_fail_fast_when_twitter_client_is_unavailable(tmp_path):
+    config = SchedulerConfig()
+    settings = ScanSettings(tmp_path / "test.db", config, ["first_account", "second_account"])
+    db = Database(settings)
+    db.initialize()
+    scheduler = SchedulerService(db, config)
+    twitter = BrokenClientTwitter()
+    scanner = ScanService(settings, db, scheduler, twitter, NullYoutube(), NullThumbnails())
+
+    result = scanner.run(force=True)
+
+    assert result["status"] == "failed"
+    assert "Twitter client unavailable" in result["message"]
+    assert result["stats"]["errors"] == 1
+    assert twitter.validated is True
+    assert twitter.calls == []
+    assert db.get_account_state("first_account") is None
+    assert db.get_account_state("second_account") is None
 
 
 def test_scan_can_be_cancelled_while_running(tmp_path):

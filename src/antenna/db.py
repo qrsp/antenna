@@ -106,6 +106,32 @@ class Database:
                 (status, dt_to_db(utcnow()), message, json.dumps(stats, ensure_ascii=False), scan_id),
             )
 
+    def cleanup_stale_running_scans(self) -> list[int]:
+        message = "Scan interrupted by application restart"
+        cleaned: list[int] = []
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, stats_json
+                FROM scans
+                WHERE status = 'running'
+                ORDER BY id
+                """
+            ).fetchall()
+            for row in rows:
+                stats = json.loads(row["stats_json"] or "{}")
+                stats["current_account"] = None
+                conn.execute(
+                    """
+                    UPDATE scans
+                    SET status = 'failed', finished_at = ?, message = ?, stats_json = ?
+                    WHERE id = ? AND status = 'running'
+                    """,
+                    (dt_to_db(utcnow()), message, json.dumps(stats, ensure_ascii=False), row["id"]),
+                )
+                cleaned.append(int(row["id"]))
+        return cleaned
+
     def get_scan(self, scan_id: int) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM scans WHERE id = ?", (scan_id,)).fetchone()
