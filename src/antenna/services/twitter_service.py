@@ -5,6 +5,7 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
+import bs4
 from dateutil import parser as date_parser
 
 from antenna.config import TWITTER_COOKIES_ENV, TwitterConfig
@@ -16,6 +17,8 @@ class TwitterRateLimitError(RuntimeError):
 
 
 class TwitterService:
+    _tweety_patch_applied = False
+
     def __init__(self, config: TwitterConfig):
         self.config = config
 
@@ -89,9 +92,41 @@ class TwitterService:
         except ImportError as exc:
             raise RuntimeError("tweety-ns is required to fetch Twitter timelines") from exc
 
+        self._patch_tweety_home_html()
         app = Twitter("session")
         app.load_cookies(self.config.cookies)
         return app
+
+    def _patch_tweety_home_html(self) -> None:
+        if TwitterService._tweety_patch_applied:
+            return
+        try:
+            from tweety.http import Request
+        except ImportError:
+            return
+
+        original_get_home_html = Request.get_home_html
+
+        async def get_home_html_with_responsive_web_fallback(request):
+            headers = request._get_request_headers()
+            headers.pop("authorization", None)
+            try:
+                response = await request._session.request(method="GET", url="https://x.com/home", headers=headers)
+                home_page = bs4.BeautifulSoup(response.content, "lxml")
+                text = str(home_page)
+                if (
+                    response.status_code in range(200, 300)
+                    and "ondemand.s" in text
+                    and "twitter-site-verification" in text
+                    and "loading-x-anim" in text
+                ):
+                    return home_page
+            except Exception:
+                pass
+            return await original_get_home_html(request)
+
+        Request.get_home_html = get_home_html_with_responsive_web_fallback
+        TwitterService._tweety_patch_applied = True
 
     def _extract_page_items(self, item: Any) -> list[Any]:
         if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], list):
