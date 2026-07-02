@@ -1,50 +1,45 @@
-# Antenna
+<div align="center">
+  <h1>Antenna</h1>
+  <p><b>把 X 變成你的專屬影音日報，自動收集 X 上追蹤帳號發佈的 YouTube 連結，打造屬於自己訂閱流</b></p>
+</div>
 
-Antenna 是一個本機執行的 FastAPI Web 服務，用來掃描設定好的 X/Twitter 帳號，從 timeline 中擷取 YouTube 連結，補上影片 metadata 與縮圖，並提供一個瀏覽器介面的 review queue。
+## Screenshots
 
-此專案適合用來追蹤特定帳號分享過的 YouTube 影片，將新影片集中整理到本機 SQLite 資料庫，再透過 Web UI 進行瀏覽、封存與後續管理。
+<table>
+  <!-- 第一行 -->
+  <tr>
+    <td width="50%" align="center" valign="middle">
+      <img src="./screenshots/Signal-Radar-Dashboard.png" style="width: 100%; height: 200px; object-fit: contain;" alt="Signal Radar Dashboard">
+    </td>
+    <td width="50%" align="center" valign="middle">
+      <img src="./screenshots/Discovery-Library-New.png" style="width: 100%; height: 200px; object-fit: contain;" alt="Discovery Library New">
+    </td>
+  </tr>
+  <!-- 第二行 -->
+  <tr>
+    <td width="50%" align="center" valign="middle">
+      <img src="./screenshots/Discovery-Library-Archived.png" style="width: 100%; height: 200px; object-fit: contain;" alt="Discovery Library Archived">
+    </td>
+    <td width="50%" align="center" valign="middle">
+      <img src="./screenshots/Antenna-Accounts.png" style="width: 100%; height: 200px; object-fit: contain;" alt="Antenna Accounts">
+    </td>
+  </tr>
+</table>
 
-## 功能
+## Quick Start
 
-- 掃描 `config.toml` 中設定的 X/Twitter 帳號清單
-- 從推文內容擷取 YouTube URL
-- 透過 YouTube metadata 補齊影片標題、頻道、影片類型等資訊
-- 下載並快取影片縮圖
-- 使用 SQLite 儲存影片資料、掃描紀錄與帳號狀態
-- 提供 Dashboard、帳號狀態、影片清單與設定檢視頁面
-- 支援 `new` / `archived` 影片狀態
-- 支援自動排程掃描、手動掃描與強制掃描
-- 提供基本 REST API 供其他工具整合
-
-## 技術棧
-
-- Python 3.13+
-- FastAPI
-- Uvicorn
-- SQLite
-- Jinja2
-- Pydantic / pydantic-settings
-- yt-dlp
-- tweety-ns
-- uv
-- pytest
-- ruff
-
-## 安裝
-
-先確認已安裝 `uv`，接著在專案根目錄執行：
-
-```powershell
+```bash
+git clone https://github.com/qrsp/antenna
 uv sync
 ```
 
-## 設定
+### Settings
 
 建立本機設定檔：
 
-```powershell
-Copy-Item config.toml.example config.toml
-Copy-Item .env.example .env
+```bash
+cp config.toml.example config.toml
+cp .env.example .env
 ```
 
 主要設定位於 `config.toml`：
@@ -64,22 +59,20 @@ Copy-Item .env.example .env
 Twitter/X cookies 放在 `.env`：
 
 ```env
-ANTENNA_TWITTER_COOKIES=""
+ANTENNA_TWITTER_COOKIES=''
 ```
 
-如果要實際掃描 X/Twitter timeline，通常需要填入有效 cookies。
-
-## 啟動
+### Start
 
 使用專案入口啟動：
 
-```powershell
+```bash
 uv run python -m antenna
 ```
 
 開發時也可以使用 reload 模式：
 
-```powershell
+```bash
 uv run uvicorn antenna.app:create_app --factory --reload
 ```
 
@@ -89,7 +82,7 @@ uv run uvicorn antenna.app:create_app --factory --reload
 http://127.0.0.1:8000
 ```
 
-## Web 頁面
+## Web Page
 
 - `/`：Dashboard，顯示新影片數、封存影片數、最近掃描與下次掃描時間
 - `/accounts`：帳號掃描狀態，可查看每個帳號的最近掃描、最近推文與下次掃描時間
@@ -157,7 +150,7 @@ PATCH /api/videos/state
 }
 ```
 
-## 掃描與排程
+## Scan and Schedule
 
 Antenna 啟動後會建立背景自動掃描服務。排程器會根據帳號狀態決定是否掃描：
 
@@ -167,57 +160,22 @@ Antenna 啟動後會建立背景自動掃描服務。排程器會根據帳號狀
 - 如果遇到 X/Twitter rate limit，會暫停掃描一段時間
 - 手動強制掃描可以略過一般排程限制
 
-## 開發
+## Development
 
 執行測試：
 
-```powershell
+```bash
 uv run pytest
 ```
 
 執行 lint：
 
-```powershell
+```bash
 uv run ruff check .
 ```
 
 格式化：
 
-```powershell
+```bash
 uv run ruff format .
 ```
-
-## 專案結構
-
-```text
-src/antenna/
-  app.py                 FastAPI app factory 與 Web UI 掛載
-  config.py              TOML / .env 設定載入與驗證
-  db.py                  SQLite 存取層
-  models.py              domain constants
-  schemas.py             API request / response schemas
-  routers/               HTTP routes
-  services/              掃描、排程、Twitter、YouTube、縮圖與 library 邏輯
-  templates/             Jinja2 templates
-  static/                CSS 與縮圖靜態檔
-tests/                   pytest 測試
-config.toml.example      設定範例
-.env.example             環境變數範例
-```
-
-## 資料位置
-
-預設資料與輸出位置：
-
-- SQLite database：`data/antenna.db`
-- 縮圖快取：`src/antenna/static/thumbnails`
-- Log 目錄：`log/`
-
-以上路徑都可以透過 `config.toml` 調整。
-
-## 注意事項
-
-- 目前只支援 `sqlite:///` database URL。
-- `.env` 可能包含敏感 cookies，不應提交到版本控制。
-- `config.toml` 可能包含個人追蹤清單，公開前請確認內容是否適合分享。
-- 此服務預設作為本機工具使用，若要公開部署，請自行補上認證、反向代理與存取控制。

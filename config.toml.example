@@ -1,9 +1,5 @@
-[twitter]
-cookies_env = "ANTENNA_TWITTER_COOKIES"
-
 [lists]
 follow = []
-blackurls = []
 
 [scheduler]
 auto_scan_interval_minutes = 60
